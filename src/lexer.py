@@ -15,14 +15,34 @@ class Lexer:
         while self.current_char != EOF and self.current_char.isspace():
             self.advance()
 
+    def skip_comment(self):
+        # czytamytak długo, aż trafimy na koniec linii albo koniec pliku
+        while self.current_char != EOF and self.current_char != '\n':
+            self.advance()
+        # '\n' zjadamy w get_next_token()
+
+    def skip_all(self):
+        # Wywołuje skip_whitespace i skip_comment aż do EOF lub do rzeczywistego tokenu
+        while self.current_char != EOF:
+            
+            if self.current_char.isspace():
+                self.skip_whitespace()
+                continue
+            
+            if self.current_char == '/' and self.reader.check_next() == '/':
+                self.skip_comment()
+                continue
+            
+            break
+
     def get_next_token(self):
-        self.skip_whitespace()
+            self.skip_all()
 
-        if self.current_char == EOF:
-            return Token(TokenType.EOF, None, self.reader.position())
+            if self.current_char == EOF:
+                return Token(TokenType.EOF, None, self.reader.position())
 
-        # narazie zwracamy token UNKNOWN
-        pos = self.reader.position()
-        char = self.current_char
-        self.advance() 
-        return Token(TokenType.UNKNOWN, char, pos)
+            pos = self.reader.position()
+            char = self.current_char
+            self.advance()
+            
+            return Token(TokenType.UNKNOWN, char, pos)
