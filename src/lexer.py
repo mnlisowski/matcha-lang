@@ -43,6 +43,63 @@ class Lexer:
 
         pos = self.reader.position()
         char = self.current_char
+
+        
+        # Operatory matematyczne
+        if char == '+':
+            self.advance()
+            return Token(TokenType.PLUS, None, pos)
+        
+        if char == '-':
+            self.advance()
+            return Token(TokenType.MINUS, None, pos)
+            
+        if char == '*':
+            self.advance()
+            return Token(TokenType.MULTIPLY, None, pos)
+            
+        if char == '/':
+            self.advance()
+            return Token(TokenType.DIVIDE, None, pos)
+            
+        # Nawiasy
+        if char == '(':
+            self.advance()
+            return Token(TokenType.LPAREN, None, pos)
+            
+        if char == ')':
+            self.advance()
+            return Token(TokenType.RPAREN, None, pos)
+            
+        if char == '{':
+            self.advance()
+            return Token(TokenType.LBRACE, None, pos)
+            
+        if char == '}':
+            self.advance()
+            return Token(TokenType.RBRACE, None, pos)
+            
+        if char == '[':
+            self.advance()
+            return Token(TokenType.LBRACKET, None, pos)
+            
+        if char == ']':
+            self.advance()
+            return Token(TokenType.RBRACKET, None, pos)
+            
+        # Interpunkcja
+        if char == ',':
+            self.advance()
+            return Token(TokenType.COMMA, None, pos)
+            
+        if char == ';':
+            self.advance()
+            return Token(TokenType.SEMICOLON, None, pos)
+
+        if char == '_':
+            self.advance()
+            return Token(TokenType.WILDCARD, None, pos)
+        
         self.advance()
 
         return Token(TokenType.UNKNOWN, char, pos)
