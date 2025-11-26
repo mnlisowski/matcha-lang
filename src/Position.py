@@ -8,12 +8,12 @@ class Position:
         return p
 
     def __str__(self):
-        return "Linia: " + str(self.line) + ", Kolumna: " + str(self.column)
+        return "[" + str(self.line) + ":" + str(self.column) + "]"
 
     def __eq__(self, other):
         if not isinstance(other, Position):
             return False
-        
+
         if self.line == other.line and self.column == other.column:
             return True
         else:
