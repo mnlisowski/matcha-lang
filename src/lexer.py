@@ -74,6 +74,43 @@ class Lexer:
             # to wtedy identyfikator
             return Token(TokenType.IDENTIFIER, text, start_pos)
         
+    def _read_string(self):
+        start_pos = self.reader.position()
+        
+        self.advance()
+        
+        result = ""
+        
+        while self.current_char != EOF and self.current_char != '"':
+            
+            if self.current_char == '\\':
+                self.advance() 
+                
+                if self.current_char == 'n':
+                    result += '\n'
+                elif self.current_char == 't':
+                    result += '\t'
+                elif self.current_char == 'r':
+                    result += '\r'
+                elif self.current_char == '"':
+                    result += '"'
+                elif self.current_char == '\\':
+                    result += '\\'
+                else: # reszte traktujemy dosłowmie
+                    
+                    result += self.current_char
+            else:
+                # Zwykły znak
+                result += self.current_char
+            
+            self.advance()
+        
+        if self.current_char == '"':
+            self.advance()
+            return Token(TokenType.STRING_LITERAL, result, start_pos)
+        else:
+            return Token(TokenType.UNKNOWN, "Niezamknięty string", start_pos)
+        
     def advance(self):
         # zeby ciagle nie pisac self.reader.advance()
         self.current_char = self.reader.advance()
@@ -118,6 +155,10 @@ class Lexer:
         # identyfikatory i słowa kluczowe 
         if char.isalpha() or char == '_':
             return self._read_identifier_or_keyword()
+        
+        # Stringi
+        if char == '"':
+            return self._read_string()
         
         # Operatory matematyczne
         if char == '+':
