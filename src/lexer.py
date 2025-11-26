@@ -20,7 +20,8 @@ KEYWORDS = {
     "string": TokenType.TYPE_STR,
     "float": TokenType.TYPE_FLT,
     "bool": TokenType.TYPE_BOOL,
-    "AND": TokenType.AND_PATTERN  
+    "AND": TokenType.AND_PATTERN, 
+    "_": TokenType.WILDCARD
 }
 
 class Lexer:
@@ -139,7 +140,7 @@ class Lexer:
             break
 
     def get_next_token(self):
-        self.skip_all()
+        self.skip_all()  
 
         if self.current_char == EOF:
             return Token(TokenType.EOF, None, self.reader.position())
