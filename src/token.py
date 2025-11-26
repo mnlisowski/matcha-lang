@@ -24,7 +24,6 @@ class Token:
         return True
 
     def __repr__(self):
-        # Format: IDENTIFIER(x) at [1:5]
 
         type_name = self.type.name
 

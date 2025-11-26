@@ -138,7 +138,6 @@ class TestLexer(unittest.TestCase):
 
     def test_sticky_operators(self):
         """Test: Sklejone operatory"""
-        # Kod: =)>asd+_
         code = "=)>asd+_"
         tokens = self.get_tokens(code)
 
@@ -158,7 +157,6 @@ class TestLexer(unittest.TestCase):
 
     def test_sticky_math(self):
         """Test: sklejone równania"""
-        # Kod: 1+2*3/4
         tokens = self.get_tokens("1+2*3/4")
 
         self.assertEqual(tokens[0].value, 1)
