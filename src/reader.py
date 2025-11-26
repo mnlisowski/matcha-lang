@@ -1,6 +1,6 @@
 from src.position import Position
 
-EOF = '\0'
+EOF = "\0"
 
 
 class CharReader:

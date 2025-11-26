@@ -1,7 +1,8 @@
 from enum import Enum, auto
 
+
 class TokenType(Enum):
-    # Słowa Kluczowe 
+    # Słowa Kluczowe
     FUN = auto()
     RETURN = auto()
     VAR = auto()
@@ -20,42 +21,42 @@ class TokenType(Enum):
     TYPE_FLT = auto()
     TYPE_BOOL = auto()
 
-    # Literały 
-    IDENTIFIER = auto()     
-    INT_LITERAL = auto()    
-    FLOAT_LITERAL = auto()  
-    STRING_LITERAL = auto()  
+    # Literały
+    IDENTIFIER = auto()
+    INT_LITERAL = auto()
+    FLOAT_LITERAL = auto()
+    STRING_LITERAL = auto()
 
     # Operatory
-    PLUS = auto()       # +
-    MINUS = auto()      # -
-    MULTIPLY = auto()   # *
-    DIVIDE = auto()     # /
-    NOT = auto()        # !
-    ASSIGN = auto()     # =
-    ARROW = auto()      # =>
-    
-    EQUAL = auto()      # ==
-    NOT_EQUAL = auto()  # !=
-    LESS = auto()       # <
-    LESS_EQ = auto()    # <=
-    GREATER = auto()    # >
-    GREATER_EQ = auto() # >=
-    
-    AND = auto()        # && 
-    OR = auto()         # || 
-    AND_PATTERN = auto() # AND (do wzorców w matchu
+    PLUS = auto()  # +
+    MINUS = auto()  # -
+    MULTIPLY = auto()  # *
+    DIVIDE = auto()  # /
+    NOT = auto()  # !
+    ASSIGN = auto()  # =
+    ARROW = auto()  # =>
 
-    LPAREN = auto()     # (
-    RPAREN = auto()     # )
-    LBRACE = auto()     # {
-    RBRACE = auto()     # }
-    LBRACKET = auto()   # [
-    RBRACKET = auto()   # ]
-    COMMA = auto()      # ,
+    EQUAL = auto()  # ==
+    NOT_EQUAL = auto()  # !=
+    LESS = auto()  # <
+    LESS_EQ = auto()  # <=
+    GREATER = auto()  # >
+    GREATER_EQ = auto()  # >=
+
+    AND = auto()  # &&
+    OR = auto()  # ||
+    AND_PATTERN = auto()  # AND (do wzorców w matchu
+
+    LPAREN = auto()  # (
+    RPAREN = auto()  # )
+    LBRACE = auto()  # {
+    RBRACE = auto()  # }
+    LBRACKET = auto()  # [
+    RBRACKET = auto()  # ]
+    COMMA = auto()  # ,
     SEMICOLON = auto()  # ;
-    WILDCARD = auto()   # _
+    WILDCARD = auto()  # _
 
     # inne
-    EOF = auto()        # Koniec pliku
-    UNKNOWN = auto()    
+    EOF = auto()  # Koniec pliku
+    UNKNOWN = auto()

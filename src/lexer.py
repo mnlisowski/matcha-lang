@@ -2,6 +2,7 @@ from src.reader import CharReader, EOF
 from src.token import Token
 from src.token_type import TokenType
 
+
 class Lexer:
     def __init__(self, reader):
         self.reader = reader
@@ -17,32 +18,31 @@ class Lexer:
 
     def skip_comment(self):
         # czytamytak długo, aż trafimy na koniec linii albo koniec pliku
-        while self.current_char != EOF and self.current_char != '\n':
+        while self.current_char != EOF and self.current_char != "\n":
             self.advance()
         # '\n' zjadamy w get_next_token()
 
     def skip_all(self):
         # Wywołuje skip_whitespace i skip_comment aż do EOF lub do rzeczywistego tokenu
         while self.current_char != EOF:
-            
             if self.current_char.isspace():
                 self.skip_whitespace()
                 continue
-            
-            if self.current_char == '/' and self.reader.check_next() == '/':
+
+            if self.current_char == "/" and self.reader.check_next() == "/":
                 self.skip_comment()
                 continue
-            
+
             break
 
     def get_next_token(self):
-            self.skip_all()
+        self.skip_all()
 
-            if self.current_char == EOF:
-                return Token(TokenType.EOF, None, self.reader.position())
+        if self.current_char == EOF:
+            return Token(TokenType.EOF, None, self.reader.position())
 
-            pos = self.reader.position()
-            char = self.current_char
-            self.advance()
-            
-            return Token(TokenType.UNKNOWN, char, pos)
+        pos = self.reader.position()
+        char = self.current_char
+        self.advance()
+
+        return Token(TokenType.UNKNOWN, char, pos)
