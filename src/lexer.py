@@ -57,6 +57,23 @@ class Lexer:
         # Jeśli nie było kropki, zwracamy Int
         return Token(TokenType.INT_LITERAL, value, start_pos)
     
+    def _read_identifier_or_keyword(self):
+        start_pos = self.reader.position()
+        text = ""
+
+        while self.current_char != EOF and (self.current_char.isalnum() or self.current_char == '_'):
+            text += self.current_char
+            self.advance()
+
+        # Sprawdzamy, czy to słowo kluczowe
+        token_type = KEYWORDS.get(text)
+
+        if token_type is not None: #to wtedy jest keyword
+            return Token(token_type, None, start_pos)
+        else:
+            # to wtedy identyfikator
+            return Token(TokenType.IDENTIFIER, text, start_pos)
+        
     def advance(self):
         # zeby ciagle nie pisac self.reader.advance()
         self.current_char = self.reader.advance()
@@ -97,6 +114,10 @@ class Lexer:
         # Liczby 
         if char.isdigit():
             return self._read_number()
+        
+        # identyfikatory i słowa kluczowe 
+        if char.isalpha() or char == '_':
+            return self._read_identifier_or_keyword()
         
         # Operatory matematyczne
         if char == '+':
