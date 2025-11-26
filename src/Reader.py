@@ -4,7 +4,7 @@ EOF = '\0'
 
 
 class CharReader:
-    def __init(self, source):
+    def __init__(self, source):
         self.source = source
         self.length = len(source)
 
