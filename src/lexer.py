@@ -2,12 +2,61 @@ from src.reader import CharReader, EOF
 from src.token import Token
 from src.token_type import TokenType
 
+KEYWORDS = {
+    "fun": TokenType.FUN,
+    "return": TokenType.RETURN,
+    "var": TokenType.VAR,
+    "if": TokenType.IF,
+    "else": TokenType.ELSE,
+    "while": TokenType.WHILE,
+    "match": TokenType.MATCH,
+    "as": TokenType.AS,
+    "case": TokenType.CASE,
+    "default": TokenType.DEFAULT,
+    "is": TokenType.IS,
+    "true": TokenType.TRUE,
+    "false": TokenType.FALSE,
+    "int": TokenType.TYPE_INT,
+    "string": TokenType.TYPE_STR,
+    "float": TokenType.TYPE_FLT,
+    "bool": TokenType.TYPE_BOOL,
+    "AND": TokenType.AND_PATTERN  
+}
 
 class Lexer:
     def __init__(self, reader):
         self.reader = reader
         self.current_char = self.reader.current()
 
+    def _read_number(self):
+        start_pos = self.reader.position()
+        value = 0
+        
+        # czesc calkowita liczby
+        while self.current_char != EOF and self.current_char.isdigit():
+            digit = ord(self.current_char) - ord('0')
+            value = value * 10 + digit
+            self.advance()
+            
+        # jesli jest kropka, to mamy floata
+        if self.current_char == '.':
+            self.advance() #kropka zjadana
+            
+            value = float(value)
+            divisor = 10.0
+            
+            # czesc ulamkowa
+            while self.current_char != EOF and self.current_char.isdigit():
+                digit = ord(self.current_char) - ord('0')
+                value += digit / divisor
+                divisor *= 10.0
+                self.advance()
+                
+            return Token(TokenType.FLOAT_LITERAL, value, start_pos)
+
+        # Jeśli nie było kropki, zwracamy Int
+        return Token(TokenType.INT_LITERAL, value, start_pos)
+    
     def advance(self):
         # zeby ciagle nie pisac self.reader.advance()
         self.current_char = self.reader.advance()
@@ -44,6 +93,10 @@ class Lexer:
         pos = self.reader.position()
         char = self.current_char
 
+        
+        # Liczby 
+        if char.isdigit():
+            return self._read_number()
         
         # Operatory matematyczne
         if char == '+':
