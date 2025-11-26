@@ -100,6 +100,62 @@ class Lexer:
             self.advance()
             return Token(TokenType.WILDCARD, None, pos)
         
+        # Operatory złożone, wymagajace uzycia check_next()
+
+        if char == '=':
+            if self.reader.check_next() == '=':
+                self.advance() 
+                self.advance() 
+                return Token(TokenType.EQUAL, None, pos)
+            elif self.reader.check_next() == '>':
+                self.advance()
+                self.advance()
+                return Token(TokenType.ARROW, None, pos)
+            else:
+                self.advance()
+                return Token(TokenType.ASSIGN, None, pos)
+
+        if char == '!':
+            if self.reader.check_next() == '=':
+                self.advance()
+                self.advance()
+                return Token(TokenType.NOT_EQUAL, None, pos)
+            else:
+                self.advance()
+                return Token(TokenType.NOT, None, pos)
+
+        if char == '<':
+            if self.reader.check_next() == '=':
+                self.advance()
+                self.advance()
+                return Token(TokenType.LESS_EQ, None, pos)
+            else:
+                self.advance()
+                return Token(TokenType.LESS, None, pos)
+
+        if char == '>':
+            if self.reader.check_next() == '=':
+                self.advance()
+                self.advance()
+                return Token(TokenType.GREATER_EQ, None, pos)
+            else:
+                self.advance()
+                return Token(TokenType.GREATER, None, pos)
+
+        if char == '&':
+            if self.reader.check_next() == '&':
+                self.advance()
+                self.advance()
+                return Token(TokenType.AND, None, pos)
+            # Pojedyncze & bedzie unknown
+        
+        if char == '|':
+            if self.reader.check_next() == '|':
+                self.advance()
+                self.advance()
+                return Token(TokenType.OR, None, pos)
+            # Pojedyncze '|' bedzie unknown
+        
         self.advance()
 
         return Token(TokenType.UNKNOWN, char, pos)
