@@ -20,49 +20,29 @@ KEYWORDS = {
     "bool": TokenType.TYPE_BOOL,
     "AND": TokenType.AND_PATTERN,
     "_": TokenType.WILDCARD,
+    "and": TokenType.AND,
+    "or": TokenType.OR,
 }
-
 
 
 SINGLE_CHAR_TOKENS = {
-    '+': TokenType.PLUS,
-    '-': TokenType.MINUS,
-    '*': TokenType.MULTIPLY,
-    '/': TokenType.DIVIDE,
-    '(': TokenType.LPAREN,
-    ')': TokenType.RPAREN,
-    '{': TokenType.LBRACE,
-    '}': TokenType.RBRACE,
-    '[': TokenType.LBRACKET,
-    ']': TokenType.RBRACKET,
-    ',': TokenType.COMMA,
-    ';': TokenType.SEMICOLON,
+    "+": TokenType.PLUS,
+    "-": TokenType.MINUS,
+    "*": TokenType.MULTIPLY,
+    "/": TokenType.DIVIDE,
+    "(": TokenType.LPAREN,
+    ")": TokenType.RPAREN,
+    "{": TokenType.LBRACE,
+    "}": TokenType.RBRACE,
+    "[": TokenType.LBRACKET,
+    "]": TokenType.RBRACKET,
+    ",": TokenType.COMMA,
+    ";": TokenType.SEMICOLON,
 }
 
 DOUBLE_CHAR_TOKENS = {
-    '=': {
-        '=': TokenType.EQUAL,
-        '>': TokenType.ARROW,
-        None: TokenType.ASSIGN
-    },
-    '!': {
-        '=': TokenType.NOT_EQUAL,
-        None: TokenType.NOT
-    },
-    '<': {
-        '=': TokenType.LESS_EQ,
-        None: TokenType.LESS
-    },
-    '>': {
-        '=': TokenType.GREATER_EQ,
-        None: TokenType.GREATER
-    },
-    '&': {
-        '&': TokenType.AND,
-        None: None  
-    },
-    '|': {
-        '|': TokenType.OR,
-        None: None  
-    }
+    "=": {"=": TokenType.EQUAL, ">": TokenType.ARROW, None: TokenType.ASSIGN},
+    "!": {"=": TokenType.NOT_EQUAL, None: TokenType.NOT},
+    "<": {"=": TokenType.LESS_EQ, None: TokenType.LESS},
+    ">": {"=": TokenType.GREATER_EQ, None: TokenType.GREATER},
 }
