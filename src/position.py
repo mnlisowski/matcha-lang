@@ -3,17 +3,11 @@ class Position:
         self.line = line
         self.column = column
 
-    def copy(self):
-        return Position(self.line, self.column)
-
     def __str__(self):
-        return "[" + str(self.line) + ":" + str(self.column) + "]"
+        return f"[{self.line}:{self.column}]"
 
     def __eq__(self, other):
         if not isinstance(other, Position):
             return False
 
-        if self.line == other.line and self.column == other.column:
-            return True
-        else:
-            return False
+        return self.line == other.line and self.column == other.column
