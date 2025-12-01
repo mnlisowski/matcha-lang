@@ -1,46 +1,52 @@
 from src.position import Position
 
-EOF = "\0"
+EOF = "\4"
 
 
 class CharReader:
-    def __init__(self, source):
-        self.source = source
-        self.length = len(source)
-
-        self.pos = -1
+    def __init__(self, stream):
+        self.stream = stream
         self.line = 1
         self.col = 0
 
+        self._next_char = self.stream.read(1)
+        if not self._next_char:
+            self._next_char = EOF
+
         self.current_char = ""
+
         self.advance()
 
-    def advance(self):
-        self.pos += 1
+    def _next_line(self):
+        self.line += 1
+        self.col = 1
 
-        if self.pos >= self.length:
-            self.current_char = EOF
-            return EOF
-
-        self.current_char = self.source[self.pos]
-
-        if self.current_char == "\n":
-            self.line += 1
-            self.col = 0
-        else:
-            self.col += 1
-
-        return self.current_char
+    def _next_column(self):
+        self.col += 1
 
     def current(self):
         return self.current_char
 
     def check_next(self):
-        next_pos = self.pos + 1
-
-        if next_pos >= self.length:
-            return EOF
-        return self.source[next_pos]
+        return self._next_char
 
     def position(self):
         return Position(self.line, self.col)
+
+    def advance(self):
+        if self.current_char == EOF:
+            return EOF
+        if self.current_char == "\n":
+            self._next_line()
+        else:
+            self._next_column()
+
+        self.current_char = self._next_char
+
+        if self.current_char != EOF:
+            new_char = self.stream.read(1)
+            self._next_char = new_char if new_char else EOF
+        else:
+            return EOF
+
+        return self.current_char
