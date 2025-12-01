@@ -1,31 +1,54 @@
 from src.reader import CharReader, EOF
 from src.token import Token
 from src.token_type import TokenType
+from src.lexer_dicts import KEYWORDS, SINGLE_CHAR_TOKENS, DOUBLE_CHAR_TOKENS
 
-KEYWORDS = {
-    "fun": TokenType.FUN,
-    "return": TokenType.RETURN,
-    "var": TokenType.VAR,
-    "if": TokenType.IF,
-    "else": TokenType.ELSE,
-    "while": TokenType.WHILE,
-    "match": TokenType.MATCH,
-    "as": TokenType.AS,
-    "case": TokenType.CASE,
-    "default": TokenType.DEFAULT,
-    "is": TokenType.IS,
-    "true": TokenType.TRUE,
-    "false": TokenType.FALSE,
-    "int": TokenType.TYPE_INT,
-    "string": TokenType.TYPE_STR,
-    "float": TokenType.TYPE_FLT,
-    "bool": TokenType.TYPE_BOOL,
-    "AND": TokenType.AND_PATTERN,
-    "_": TokenType.WILDCARD,
-}
 
 
 class Lexer:
+    SINGLE_CHAR_TOKENS = {
+        '+': TokenType.PLUS,
+        '-': TokenType.MINUS,
+        '*': TokenType.MULTIPLY,
+        '/': TokenType.DIVIDE,
+        '(': TokenType.LPAREN,
+        ')': TokenType.RPAREN,
+        '{': TokenType.LBRACE,
+        '}': TokenType.RBRACE,
+        '[': TokenType.LBRACKET,
+        ']': TokenType.RBRACKET,
+        ',': TokenType.COMMA,
+        ';': TokenType.SEMICOLON,
+    }
+
+    DOUBLE_CHAR_TOKENS = {
+        '=': {
+            '=': TokenType.EQUAL,
+            '>': TokenType.ARROW,
+            None: TokenType.ASSIGN
+        },
+        '!': {
+            '=': TokenType.NOT_EQUAL,
+            None: TokenType.NOT
+        },
+        '<': {
+            '=': TokenType.LESS_EQ,
+            None: TokenType.LESS
+        },
+        '>': {
+            '=': TokenType.GREATER_EQ,
+            None: TokenType.GREATER
+        },
+        '&': {
+            '&': TokenType.AND,
+            None: None  
+        },
+        '|': {
+            '|': TokenType.OR,
+            None: None  
+        }
+    }
+
     def __init__(self, reader):
         self.reader = reader
         self.current_char = self.reader.current()
@@ -140,6 +163,71 @@ class Lexer:
 
             break
 
+    def _try_read_comment(self):
+        if self.current_char != '/' or self.reader.check_next() != '/':
+            return None
+        
+        start_pos = self.reader.position()
+        self.advance() 
+        self.advance()  
+        
+        comment_text = []
+        exceeded_soft_limit = False
+        
+        while self.current_char != EOF and self.current_char != '\n':
+            if len(comment_text) > self.hard_max_comment:
+                raise ValueError(
+                    f"Comment exceeded hard limit  at {start_pos}. "
+                )
+            
+            comment_text.append(self.current_char)
+            self.advance()
+            
+            if len(comment_text) > self.max_comment_length:
+                exceeded_soft_limit = True
+        
+        if exceeded_soft_limit:
+            return Token(TokenType.UNKNOWN, 
+                       f"Comment too long)", start_pos)
+        
+        return Token(TokenType.COMMENT, ''.join(comment_text), start_pos)
+
+        
+
+
+    def _try_read_single_char_token(self):
+        if self.current_char not in self.SINGLE_CHAR_TOKENS:
+            return None
+        
+        pos = self.reader.position()
+        token_type = self.SINGLE_CHAR_TOKENS[self.current_char]
+        self.advance()
+        return Token(token_type, None, pos)
+    
+    def _try_read_compound_operator(self):
+        if self.current_char not in self.COMPOUND_OPERATORS:
+            return None
+        
+        pos = self.reader.position()
+        first = self.current_char
+        self.advance()
+        
+        options = self.DOUBLE_CHAR_TOKENS[first]
+        token_type = options.get(self.current_char)
+        
+        if token_type:
+            self.advance()
+            return Token(token_type, None, pos)
+        
+        # Fallback na pojedynczy znak
+        fallback = options[None]
+        if fallback is None:
+            # Pojedyncze & lub | to błąd
+            return Token(TokenType.UNKNOWN, first, pos)
+        
+        return Token(fallback, None, pos)
+    
+
     def get_next_token(self):
         self.skip_all()
 
@@ -160,117 +248,120 @@ class Lexer:
         # Stringi
         if char == '"':
             return self._read_string()
+        
+   
 
-        # Operatory matematyczne
-        if char == "+":
-            self.advance()
-            return Token(TokenType.PLUS, None, pos)
 
-        if char == "-":
-            self.advance()
-            return Token(TokenType.MINUS, None, pos)
+        # # Operatory matematyczne
+        # if char == "+":
+        #     self.advance()
+        #     return Token(TokenType.PLUS, None, pos)
 
-        if char == "*":
-            self.advance()
-            return Token(TokenType.MULTIPLY, None, pos)
+        # if char == "-":
+        #     self.advance()
+        #     return Token(TokenType.MINUS, None, pos)
 
-        if char == "/":
-            self.advance()
-            return Token(TokenType.DIVIDE, None, pos)
+        # if char == "*":
+        #     self.advance()
+        #     return Token(TokenType.MULTIPLY, None, pos)
 
-        # Nawiasy
-        if char == "(":
-            self.advance()
-            return Token(TokenType.LPAREN, None, pos)
+        # if char == "/":
+        #     self.advance()
+        #     return Token(TokenType.DIVIDE, None, pos)
 
-        if char == ")":
-            self.advance()
-            return Token(TokenType.RPAREN, None, pos)
+        # # Nawiasy
+        # if char == "(":
+        #     self.advance()
+        #     return Token(TokenType.LPAREN, None, pos)
 
-        if char == "{":
-            self.advance()
-            return Token(TokenType.LBRACE, None, pos)
+        # if char == ")":
+        #     self.advance()
+        #     return Token(TokenType.RPAREN, None, pos)
 
-        if char == "}":
-            self.advance()
-            return Token(TokenType.RBRACE, None, pos)
+        # if char == "{":
+        #     self.advance()
+        #     return Token(TokenType.LBRACE, None, pos)
 
-        if char == "[":
-            self.advance()
-            return Token(TokenType.LBRACKET, None, pos)
+        # if char == "}":
+        #     self.advance()
+        #     return Token(TokenType.RBRACE, None, pos)
 
-        if char == "]":
-            self.advance()
-            return Token(TokenType.RBRACKET, None, pos)
+        # if char == "[":
+        #     self.advance()
+        #     return Token(TokenType.LBRACKET, None, pos)
 
-        # Interpunkcja
-        if char == ",":
-            self.advance()
-            return Token(TokenType.COMMA, None, pos)
+        # if char == "]":
+        #     self.advance()
+        #     return Token(TokenType.RBRACKET, None, pos)
 
-        if char == ";":
-            self.advance()
-            return Token(TokenType.SEMICOLON, None, pos)
+        # # Interpunkcja
+        # if char == ",":
+        #     self.advance()
+        #     return Token(TokenType.COMMA, None, pos)
 
-        if char == "_":
-            self.advance()
-            return Token(TokenType.WILDCARD, None, pos)
+        # if char == ";":
+        #     self.advance()
+        #     return Token(TokenType.SEMICOLON, None, pos)
 
-        # Operatory złożone, wymagajace uzycia check_next()
+        # if char == "_":
+        #     self.advance()
+        #     return Token(TokenType.WILDCARD, None, pos)
 
-        if char == "=":
-            if self.reader.check_next() == "=":
-                self.advance()
-                self.advance()
-                return Token(TokenType.EQUAL, None, pos)
-            elif self.reader.check_next() == ">":
-                self.advance()
-                self.advance()
-                return Token(TokenType.ARROW, None, pos)
-            else:
-                self.advance()
-                return Token(TokenType.ASSIGN, None, pos)
+        # # Operatory złożone, wymagajace uzycia check_next()
 
-        if char == "!":
-            if self.reader.check_next() == "=":
-                self.advance()
-                self.advance()
-                return Token(TokenType.NOT_EQUAL, None, pos)
-            else:
-                self.advance()
-                return Token(TokenType.NOT, None, pos)
+        # if char == "=":
+        #     if self.reader.check_next() == "=":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.EQUAL, None, pos)
+        #     elif self.reader.check_next() == ">":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.ARROW, None, pos)
+        #     else:
+        #         self.advance()
+        #         return Token(TokenType.ASSIGN, None, pos)
 
-        if char == "<":
-            if self.reader.check_next() == "=":
-                self.advance()
-                self.advance()
-                return Token(TokenType.LESS_EQ, None, pos)
-            else:
-                self.advance()
-                return Token(TokenType.LESS, None, pos)
+        # if char == "!":
+        #     if self.reader.check_next() == "=":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.NOT_EQUAL, None, pos)
+        #     else:
+        #         self.advance()
+        #         return Token(TokenType.NOT, None, pos)
 
-        if char == ">":
-            if self.reader.check_next() == "=":
-                self.advance()
-                self.advance()
-                return Token(TokenType.GREATER_EQ, None, pos)
-            else:
-                self.advance()
-                return Token(TokenType.GREATER, None, pos)
+        # if char == "<":
+        #     if self.reader.check_next() == "=":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.LESS_EQ, None, pos)
+        #     else:
+        #         self.advance()
+        #         return Token(TokenType.LESS, None, pos)
 
-        if char == "&":
-            if self.reader.check_next() == "&":
-                self.advance()
-                self.advance()
-                return Token(TokenType.AND, None, pos)
-            # Pojedyncze & bedzie unknown
+        # if char == ">":
+        #     if self.reader.check_next() == "=":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.GREATER_EQ, None, pos)
+        #     else:
+        #         self.advance()
+        #         return Token(TokenType.GREATER, None, pos)
 
-        if char == "|":
-            if self.reader.check_next() == "|":
-                self.advance()
-                self.advance()
-                return Token(TokenType.OR, None, pos)
-            # Pojedyncze '|' bedzie unknown
+        # if char == "&":
+        #     if self.reader.check_next() == "&":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.AND, None, pos)
+        #     # Pojedyncze & bedzie unknown
+
+        # if char == "|":
+        #     if self.reader.check_next() == "|":
+        #         self.advance()
+        #         self.advance()
+        #         return Token(TokenType.OR, None, pos)
+        #     # Pojedyncze '|' bedzie unknown
 
         self.advance()
 
