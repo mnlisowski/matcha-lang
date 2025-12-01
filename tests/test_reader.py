@@ -1,73 +1,83 @@
 import unittest
+import io
 from src.reader import CharReader, EOF
+from src.position import Position
 
 
 class TestCharReader(unittest.TestCase):
-    def test_empty_source(self):
-        # Pusty plik
-        reader = CharReader("")
+    def get_reader(self, text):
+        return CharReader(io.StringIO(text))
 
-        self.assertEqual(reader.current(), EOF)
-        self.assertEqual(reader.advance(), EOF)
+    def test_positions_and_line_counting(self):
+        """
+        Sprawdza, czy Reader poprawnie wylicza koncową pozycję
+        """
+        cases = [
+            ("empty", "", 1, 1),
+            ("one_char", "a", 1, 2),
+            ("simple_line", "abc", 1, 4),
+            ("ab", "ab", 1, 3),
+            ("newline", "a\nb", 2, 2),
+            ("only_enter", "\n", 2, 1),
+            ("multi_lines", "ab\ncd\ne", 3, 2),
+            ("tabulators", "\t\t", 1, 3),
+        ]
 
-    def test_code_snippet(self):
-        code = """fun main() {
-        var x = 10;
-}"""
-        reader = CharReader(code)
+        for name, text, exp_line, exp_col in cases:
+            with self.subTest(case=name):
+                reader = self.get_reader(text)
 
-        self.assertEqual(reader.current(), "f")
-        self.assertEqual(str(reader.position()), "[1:1]")
+                while reader.current() != EOF:
+                    reader.advance()
 
-        reader.advance()
-        reader.advance()
+                self.assertEqual(reader.line, exp_line, f"Błąd linii w '{name}'")
+                self.assertEqual(reader.col, exp_col, f"Błąd kolumny w '{name}'")
 
-        char = reader.advance()
-        self.assertEqual(char, " ")
-        self.assertEqual(str(reader.position()), "[1:4]")
+    def test_full_content_reading(self):
+        """
+        Sprawdza, czy Reader odczytuje poprawną sekwencję znaków.
+        """
 
-    def test_line_counting(self):
-        source = "A\nB\nC"
-        reader = CharReader(source)
+        cases = [
+            ("empty", "", [EOF]),
+            ("simple", "abc", ["a", "b", "c", EOF]),
+            ("newlines", "a\nb", ["a", "\n", "b", EOF]),
+            (
+                "polish",
+                "ąź",
+                ["ą", "ź", EOF],
+            ),  # Test kodowania (jeśli StringIO obsłuży)
+        ]
 
-        self.assertEqual(reader.current(), "A")
-        self.assertEqual(str(reader.position()), "[1:1]")
+        for name, text, expected_chars in cases:
+            with self.subTest(case=name):
+                reader = self.get_reader(text)
+                result_chars = []
 
-        char = reader.advance()
-        self.assertEqual(char, "\n")
+                while reader.current() != EOF:
+                    result_chars.append(reader.current())
+                    reader.advance()
 
-        char = reader.advance()
-        self.assertEqual(char, "B")
-        self.assertEqual(str(reader.position()), "[2:1]")
+                result_chars.append(EOF)
+                self.assertEqual(result_chars, expected_chars)
 
-        reader.advance()
+    def test_check_next_logic(self):
+        """
+        Testuje logikę podglądu (check_next) na różnych przypadkach.
+        """
+        cases = [
+            # text, current_char_index, expected_next
+            ("ab", "b"),
+            ("a", EOF),
+            ("", EOF),
+        ]
 
-        char = reader.advance()
-        self.assertEqual(char, "C")
-        self.assertEqual(str(reader.position()), "[3:1]")
+        for text, expected_next in cases:
+            with self.subTest(text=text):
+                reader = self.get_reader(text)
+                # Wykonujemy N advance'ów
 
-    def test_eof_behavior(self):
-        reader = CharReader("a")
-
-        reader.advance()
-        self.assertEqual(reader.current(), EOF)
-
-        self.assertEqual(reader.advance(), EOF)
-        self.assertEqual(reader.advance(), EOF)
-
-        self.assertEqual(reader.check_next(), EOF)
-
-    def test_unicode_chars(self):
-        reader = CharReader("Zażółć")
-
-        self.assertEqual(reader.current(), "Z")
-        self.assertEqual(str(reader.position()), "[1:1]")
-
-        reader.advance()
-        reader.advance()
-
-        self.assertEqual(reader.current(), "ż")
-        self.assertEqual(str(reader.position()), "[1:3]")
+                self.assertEqual(reader.check_next(), expected_next)
 
 
 if __name__ == "__main__":
