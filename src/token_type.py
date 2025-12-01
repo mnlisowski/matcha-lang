@@ -43,8 +43,8 @@ class TokenType(Enum):
     GREATER = auto()  # >
     GREATER_EQ = auto()  # >=
 
-    AND = auto()  # &&
-    OR = auto()  # ||
+    AND = auto()  # and
+    OR = auto()  # or
     AND_PATTERN = auto()  # AND (do wzorców w matchu
 
     LPAREN = auto()  # (
@@ -56,6 +56,7 @@ class TokenType(Enum):
     COMMA = auto()  # ,
     SEMICOLON = auto()  # ;
     WILDCARD = auto()  # _
+    COMMENT = auto()
 
     # inne
     EOF = auto()  # Koniec pliku

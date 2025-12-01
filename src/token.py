@@ -24,7 +24,6 @@ class Token:
         return True
 
     def __repr__(self):
-
         type_name = self.type.name
 
         if self.value is not None:
