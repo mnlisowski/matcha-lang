@@ -424,30 +424,30 @@ statement           ::== function_definition
                      |   if_statement
                      |   while_statement
                      |   return_statement
-                     |   assignment_statement
                      |   expression_statement
                      |   block_statement
+                     |   assign_or_call_statement
                      ;
 
 block_statement     ::== LBRACE { statement } RBRACE
 
-function_definition ::== FUN IDENTIFIER LPAREN [param_list] RPAREN block_statement
-param_list          ::== IDENTIFIER { COMMA IDENTIFIER }
+function_definition ::== FUN IDENTIFIER LPAREN param_list RPAREN block_statement
+param_list          ::== [ IDENTIFIER { COMMA IDENTIFIER } ]
 
 if_statement        ::== IF LPAREN expression RPAREN block_statement
                          [ ELSE block_statement ]
 while_statement     ::== WHILE LPAREN expression RPAREN block_statement
 return_statement    ::== RETURN [ expression ] SEMICOLON
-assignment_statement::== [ VAR ] IDENTIFIER ASSIGN expression SEMICOLON
+assign_or_call_statement ::== call_or_identifier [ ASSIGN expression ] SEMICOLON 
 expression_statement::== expression SEMICOLON
 
 #  Instrukcja 'match'
 match_statement     ::== MATCH match_header LBRACE { case_branch } RBRACE
+match_header        ::== [ expression [AS IDENTIFIER] { COMMA expression [AS IDENTIFIER] } ] 
 
-# nagłówek - uwzględnione wiele aliasów
-match_header        ::== [ expression AS IDENTIFIER { COMMA expression AS IDENTIFIER } ]
 
-case_branch         ::== CASE case_condition ARROW block_statement [ COMMA ]
+
+case_branch         ::== case_condition ARROW block_statement [ COMMA ]
 
 # Parser decyduje na podstawie pierwszego tokenu:
 case_condition      ::== positional_pattern     # Jeśli token to LBRACKET '['
@@ -477,14 +477,12 @@ term                ::== factor { (PLUS | MINUS) factor }
 factor              ::== unary { (MULTIPLY | DIVIDE) unary }
 unary               ::= [ NOT | MINUS ] primary
 primary             ::== literal
-                     |   IDENTIFIER
-                     |   type # (dla typeof(x) == int)
-                     |   call
-                     |   LPAREN expression RPAREN  # Obsługa nawiasów
+                     |   LPAREN expression RPAREN
+                     |   call_or_identifier
                      ;
 
-call                ::== IDENTIFIER LPAREN [ argument_list ] RPAREN
-argument_list       ::== expression { COMMA expression }
+call_or_identifier  ::== IDENTIFIER [ LPAREN argument_list RPAREN ]
+argument_list       ::== [ expression { COMMA expression } ]
 literal             ::== INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL | TRUE | FALSE
 type                ::== TYPE_INT | TYPE_STR | TYPE_FLT | TYPE_BOOL
 ```
