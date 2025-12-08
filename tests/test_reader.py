@@ -21,6 +21,7 @@ class TestCharReader(unittest.TestCase):
             ("only_enter", "\n", 2, 1),
             ("multi_lines", "ab\ncd\ne", 3, 2),
             ("tabulators", "\t\t", 1, 3),
+            ("multi_new_lines", "\n\n\n\na\n\naab", 7, 4),
         ]
 
         for name, text, exp_line, exp_col in cases:
@@ -46,7 +47,7 @@ class TestCharReader(unittest.TestCase):
                 "polish",
                 "ąź",
                 ["ą", "ź", EOF],
-            ),  # Test kodowania (jeśli StringIO obsłuży)
+            ),  
         ]
 
         for name, text, expected_chars in cases:
@@ -75,7 +76,6 @@ class TestCharReader(unittest.TestCase):
         for text, expected_next in cases:
             with self.subTest(text=text):
                 reader = self.get_reader(text)
-                # Wykonujemy N advance'ów
 
                 self.assertEqual(reader.check_next(), expected_next)
 

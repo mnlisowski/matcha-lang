@@ -20,7 +20,7 @@ def analyze_source(input_stream):
 
             break
 
-
+# argumenty wywolania
 def main():
     # Czytanie z tekstu
     source_code_text = """

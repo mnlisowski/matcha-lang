@@ -140,6 +140,9 @@ class TestLexer(unittest.TestCase):
                 tokens = self.get_tokens(input_code)
                 self.assertEqual(tokens[0].type, token_type)
 
+
+        a = " Hello  \
+        word"
     # Testy stringów
     def test_string_literals(self):
         """Test: Literały stringów"""
@@ -149,9 +152,13 @@ class TestLexer(unittest.TestCase):
             ("word", '"Hello"', "Hello"),
             ("with_spaces", '"Hello World"', "Hello World"),
             ("newline", r'"A\nB"', "A\nB"),
+            # sprawdzic ta stałą tekstową, poczytać
+            #("two_lines", r'"A \
+            #B', "")
             ("tab", r'"A\tB"', "A\tB"),
             ("quote", r'"A\"B"', 'A"B'),
             ("backslash", r'"A\\B"', "A\\B"),
+    
         ]
 
         for name, input_code, expected_value in cases:
@@ -188,6 +195,7 @@ class TestLexer(unittest.TestCase):
             ("with_underscore", "_private", "_private"),
             ("trailing_underscore", "test_", "test_"),
             ("with_digits", "var123", "var123"),
+            
         ]
 
         for name, input_code, expected_value in cases:
@@ -424,7 +432,7 @@ class TestLexer(unittest.TestCase):
     def test_hard_limits(self):
         """Test: Hard limity"""
         cases = [
-            ("too_many_tokens", "1 " * 5, {"max_tokens": 5}),
+    
             ("long_string", '"' + "a" * 11000 + '"', {"hard_max_string": 10240}),
             ("long_identifier", "a" * 700, {"hard_max_identifier": 640}),
             ("long_comment", "//" + "x" * 6000, {"hard_max_comment": 5120}),
