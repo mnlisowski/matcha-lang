@@ -10,6 +10,12 @@ from src.ast_nodes import (
     FunctionDefinition, MatchStatement, FunctionCallStatement, CaseBranch, AssignmentStatement,
 )
 
+class ParserError(Exception):
+    pass
+
+STRATEGY_CONTINUE = "CONTINUE"
+STRATEGY_ABORT = "ABORT"
+
 class Parser:
     def __init__(self, lexer: Lexer, error_handler):
         self.lexer = lexer
@@ -30,15 +36,18 @@ class Parser:
         else:
             self.error_handler(f"Error at Unknown: {message}")
 
-    def consume(self, expected_type: TokenType, error_message: str) -> bool:
-      
+    def consume(self, expected_type: TokenType, error_message: str, strategy: str = "CONTINUE") -> bool:
         if self.current_token.type == expected_type:
             self.advance()
             return True
         else:
             self.error(f"{error_message} (Found: {self.current_token.type.name})")
-            return False
             
+            if strategy == "ABORT":
+                raise ParserError(error_message)
+            
+            return False
+        
     def match(self, *types: TokenType) -> bool:
         # czy obecny token type jest jednym z podanych typów
 
@@ -46,13 +55,21 @@ class Parser:
 
 
     def parse_program(self) -> Program:
-        statements: list[Statement] = []
-        #wywalic statementy, zamaist tego slownik definicji funkcji
-        while (stmt := self.try_parse_statement()):
-        
-            statements.append(stmt)
+        functions = {}
 
-        return Program(statements)
+        try:
+
+            while (func_def := self.try_parse_function_definition()):
+            
+                if func_def.name in functions:
+                    self.error(f"Function '{func_def.name}' is already defined")
+
+                functions[func_def.name] = func_def
+
+        except ParserError:
+            return Program(functions)
+
+        return Program(functions)
 
     
     def try_parse_statement(self) -> Optional[Statement]:
@@ -61,7 +78,6 @@ class Parser:
         if (stmt := self.try_parse_while_statement()): return stmt
         if (stmt := self.try_parse_return_statement()): return stmt
         if (stmt := self.try_parse_match_statement()): return stmt
-        if (stmt := self.try_parse_function_definition()): return stmt
         if (stmt := self.try_parse_block()): return stmt
         
 
@@ -137,8 +153,13 @@ class Parser:
 
     def try_parse_function_definition(self) -> Optional[Expression]:
 
-        if not self.match(TokenType.FUN):
+        if self.match(TokenType.EOF):
             return None
+        
+        if not self.match(TokenType.FUN):
+            self.error(f"Expected function definition (fun) or EOF, found: {self.current_token.type}")
+            raise ParserError("Unexpected token at top level")
+
         self.advance() 
 
         # Nazwa funkcji 
@@ -147,19 +168,18 @@ class Parser:
             self.advance()
         else:
             self.error("Expected function name")
-            # rzucamy wyjatek, name = error jest bez sensu, konczymy parsowanie
-            # zastanowic kiedy kontynuujemy parsownaie a kiedy konczymy 
-            name = "error"
-
-        self.consume(TokenType.LPAREN, "Expected '('")
+            raise ParserError("Expected function name")
+    
+        self.consume(TokenType.LPAREN, "Expected '('", )
         
         params = self._parse_parameter_list()
         
         self.consume(TokenType.RPAREN, "Expected ')' after parameters")
 
-        body = self.try_parse_block()
-        # trzeba sprawdzic czy blok został rzeczywiscie stworzony
-        # obiekt tworzony w fdefinition fajnie by bylo jakby mial pozycje
+        if (body := self.try_parse_block()) is None:
+                    self.error(f"Expected body for function '{name}'")
+                    raise ParserError(f"Missing body for function {name}")
+        
         return FunctionDefinition(name, params, body)
 
     def _parse_parameter(self) -> str:
