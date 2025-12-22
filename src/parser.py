@@ -27,24 +27,25 @@ class Parser:
     def advance(self):
         self.current_token = self.lexer.get_next_token()
 
-    def error(self, message: str):
-     
+    def error(self, message: str, strategy: str = "CONTINUE"):
         if self.current_token:
             pos = self.current_token.position
             val = self.current_token.value if self.current_token.value is not None else self.current_token.type
-            self.error_handler(f"Error at {pos} ('{val}'): {message}")
+            full_msg = f"Error at {pos} ('{val}'): {message}"
         else:
-            self.error_handler(f"Error at Unknown: {message}")
+            full_msg = f"Error at Unknown: {message}"
+
+        self.error_handler(full_msg)
+
+        if strategy == "ABORT":
+            raise ParserError(full_msg)
 
     def consume(self, expected_type: TokenType, error_message: str, strategy: str = "CONTINUE") -> bool:
         if self.current_token.type == expected_type:
             self.advance()
             return True
         else:
-            self.error(f"{error_message} (Found: {self.current_token.type.name})")
-            
-            if strategy == "ABORT":
-                raise ParserError(error_message)
+            self.error(f"{error_message} (Found: {self.current_token.type.name})", str)
             
             return False
         
@@ -107,17 +108,24 @@ class Parser:
         self.advance()
 
         self.consume(TokenType.LPAREN, "Expected '(' after 'if'")
+
         if (condition:= self.try_parse_expression()) is None:
             self.error("expression needed in if statement")
+
         self.consume(TokenType.RPAREN, "Expected ')' after condition")
 
-        then_branch = self.try_parse_statement()
-        # sprawdzamy czy istnieje then_branch
+        then_branch = self.try_parse_block()
+
+        if then_branch is None:
+       
+            self.error("Expected statement after 'if' condition", strategy="ABORT")
+
         else_branch = None
         if self.match(TokenType.ELSE):
             self.advance()
-            else_branch = self.try_parse_statement()
-            #sprawdzamy czy else_branch jest nullem
+            else_branch = self.try_parse_block()
+            if else_branch is None:
+                self.error("Expected statement after 'else'", strategy="ABORT")
     
 
         return IfStatement(condition, then_branch, else_branch)
