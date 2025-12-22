@@ -47,7 +47,7 @@ class Parser:
 
     def parse_program(self) -> Program:
         statements: list[Statement] = []
-
+        #wywalic statementy, zamaist tego slownik definicji funkcji
         while (stmt := self.try_parse_statement()):
         
             statements.append(stmt)
@@ -63,6 +63,7 @@ class Parser:
         if (stmt := self.try_parse_match_statement()): return stmt
         if (stmt := self.try_parse_function_definition()): return stmt
         if (stmt := self.try_parse_block()): return stmt
+        
 
         # zmiana - assign lub call jak na wykladzie
         if (stmt := self.try_parse_assign_or_call_statement()): return stmt
@@ -77,13 +78,9 @@ class Parser:
         self.advance() 
 
         stmts = []
-        while not self.match(TokenType.RBRACE, TokenType.EOF):
-            stmt = self.try_parse_statement()
-            if stmt:
-                stmts.append(stmt)
-            else:
-                self.error(f"Unexpected token inside block")
-                self.advance() 
+        while (stmt:= self.try_parse_statement()):
+            stmts.append(stmt)
+            self.advance() 
 
         self.consume(TokenType.RBRACE, "Expected '}' after block")
         return Block(stmts)
@@ -94,17 +91,18 @@ class Parser:
         self.advance()
 
         self.consume(TokenType.LPAREN, "Expected '(' after 'if'")
-        condition = self.try_parse_expression()
-        if condition is None:
+        if (condition:= self.try_parse_expression()) is None:
             self.error("expression needed in if statement")
         self.consume(TokenType.RPAREN, "Expected ')' after condition")
 
         then_branch = self.try_parse_statement()
-        
+        # sprawdzamy czy istnieje then_branch
         else_branch = None
         if self.match(TokenType.ELSE):
             self.advance()
             else_branch = self.try_parse_statement()
+            #sprawdzamy czy else_branch jest nullem
+    
 
         return IfStatement(condition, then_branch, else_branch)
 
@@ -115,12 +113,13 @@ class Parser:
         self.advance()
 
         self.consume(TokenType.LPAREN, "Expected '(' after while")
-        condition = self.try_parse_expression()
-        if condition is None:
+        if (condition:= self.try_parse_expression()) is None:
             self.error("Expected block in while loop")
         self.consume(TokenType.RPAREN, "need ')'")
+        # musimy sprawdzic czy body istnieje
 
         body = self.try_parse_block()
+        # musi byc parse statement, i trzeba umiescic w gramatyce
         return WhileStatement(condition, body)
 
     def try_parse_return_statement(self) -> Optional[Statement]:
@@ -136,7 +135,8 @@ class Parser:
         self.consume(TokenType.SEMICOLON, "Expected ';' after return")
         return ReturnStatement(expr)
 
-    def try_parse_function_definition(self) -> Optional[Statement]:
+    def try_parse_function_definition(self) -> Optional[Expression]:
+
         if not self.match(TokenType.FUN):
             return None
         self.advance() 
@@ -147,6 +147,8 @@ class Parser:
             self.advance()
         else:
             self.error("Expected function name")
+            # rzucamy wyjatek, name = error jest bez sensu, konczymy parsowanie
+            # zastanowic kiedy kontynuujemy parsownaie a kiedy konczymy 
             name = "error"
 
         self.consume(TokenType.LPAREN, "Expected '('")
@@ -156,31 +158,42 @@ class Parser:
         self.consume(TokenType.RPAREN, "Expected ')' after parameters")
 
         body = self.try_parse_block()
+        # trzeba sprawdzic czy blok został rzeczywiscie stworzony
+        # obiekt tworzony w fdefinition fajnie by bylo jakby mial pozycje
         return FunctionDefinition(name, params, body)
 
-    def _parse_parameter_list(self) -> list[str]:
-        params = []
-        if self.match(TokenType.RPAREN):
-            return params
-
+    def _parse_parameter(self) -> str:
         if self.match(TokenType.IDENTIFIER):
-            params.append(self.current_token.value)
-            self.advance()
-            while self.match(TokenType.COMMA):
+                parameter = self.current_token.value
                 self.advance()
-                if self.match(TokenType.IDENTIFIER):
-                    params.append(self.current_token.value)
-                    self.advance()
+                return parameter
+
+    def _parse_parameter_list(self) -> list[str]:
+
+        params = []
+
+        if (parameter := self.parse_parameter()):
+            params.append(parameter)
+        else:
+            return params
+        
+        while self.match(TokenType.COMMA):
+                self.advance()
+                if parameter := self._parse_parameter():
+                    params.append(parameter)
+
                 else:
                     self.error("Expected parameter name after coma")
-        
         return params
+
+            
 
     def try_parse_match_statement(self) -> Optional[Statement]:
         pass
 
     def _parse_case_condition(self):
         pass
+
 
     def try_parse_assign_or_call_statement(self) -> Optional[Statement]:
         if not self.match(TokenType.IDENTIFIER):
@@ -190,6 +203,7 @@ class Parser:
         self.advance() 
 
         # assign
+        # 
         if self.match(TokenType.ASSIGN):
             self.advance()
             expr = self.try_parse_expression()
@@ -197,7 +211,7 @@ class Parser:
                 self.error("Expected expression after assignment")
             self.consume(TokenType.SEMICOLON, "Expected ';'")
             return AssignmentStatement(name, expr)
-
+        # powinno byc w osobnej metodzie
         # call
         elif self.match(TokenType.LPAREN):
             self.advance()
@@ -218,6 +232,8 @@ class Parser:
         left = self.try_parse_logic_and()
         if left is None: return None
 
+# tokeny nie powinny sie pojawiac w drzewie, 
+# zrobic klase or_expression i tak dalej, 
         while self.match(TokenType.OR):
             op = self.current_token
             self.advance()
@@ -259,7 +275,8 @@ class Parser:
     def try_parse_comparison(self) -> Optional[Expression]:
         left = self.try_parse_term()
         if left is None: return None
-
+# mapowanie typu tokenu operatora na konstruktor obiektu odpowiedniej klasy
+# pytać getem o konstruktor
         while self.match(TokenType.GREATER, TokenType.GREATER_EQ, TokenType.LESS, TokenType.LESS_EQ):
             op = self.current_token
             self.advance()
@@ -270,6 +287,7 @@ class Parser:
             left = BinaryExpression(left, op, right)
         return left
 
+# ebnf - niefortunne nazwy wewnatrz expression (term/factor)
     def try_parse_term(self) -> Optional[Expression]:
         left = self.try_parse_factor()
         if left is None: return None
@@ -298,6 +316,7 @@ class Parser:
             left = BinaryExpression(left, op, right)
         return left
 
+# w ebnfie wywolujemy primary tylko raz, a w kodzie 2
     def try_parse_unary(self) -> Optional[Expression]:
         if self.match(TokenType.NOT, TokenType.MINUS):
             op = self.current_token
@@ -309,6 +328,7 @@ class Parser:
             return UnaryExpression(op, operand)
         
         return self.try_parse_primary()
+
 
     def try_parse_primary(self) -> Optional[Expression]:
         tt = self.current_token.type
@@ -331,7 +351,7 @@ class Parser:
         elif tt == TokenType.FALSE:
             self.advance()
             return Literal(False, "bool")
-        
+        #355 do 361 powinno byc try parse
         elif tt == TokenType.LPAREN:
             self.advance()
             expr = self.try_parse_expression()
@@ -339,7 +359,7 @@ class Parser:
                 self.error("Expected expression inside")
             self.consume(TokenType.RPAREN, "Expected ')'")
             return expr
-        
+        #identifier powinien byc sprawdzany w 30, w call or id expression
         elif tt == TokenType.IDENTIFIER:
             return self.parse_call_or_identifier_expression()
 
@@ -347,12 +367,14 @@ class Parser:
 
 
     def parse_call_or_identifier_expression(self) -> Expression:
+        #srp, nie sprawdzamy w parse primary, tylko tutaj
         name = self.current_token.value
         self.advance()
-
+        # zrobic funkcje parsujace do lparen, i moze zwroci none
         if self.match(TokenType.LPAREN):
             self.advance()
             args = self.parse_argument_list()
+            #tu sprwadzamy rparen przed argument list
             self.consume(TokenType.RPAREN, "Expected ')'")
             return FunctionCall(name, args)
         else:
@@ -360,11 +382,8 @@ class Parser:
 
     def parse_argument_list(self) -> list[Expression]:
         args = []
-        if self.match(TokenType.RPAREN):
-            return args
+        if arg := self.try_parse_expression():
 
-        arg = self.try_parse_expression()
-        if arg:
             args.append(arg)
             while self.match(TokenType.COMMA):
                 self.advance()
