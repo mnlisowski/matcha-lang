@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Union, Tuple
 
 @dataclass
 class SourceLocation:
@@ -18,7 +18,25 @@ class Statement(ASTNode):
 class Expression(ASTNode):
     pass
 
-#wyrażenia
+
+@dataclass
+class Literal(Expression):
+    value: Any        
+    type_name: str 
+    location: SourceLocation
+
+@dataclass
+class Variable(Expression):
+    name: str
+    location: SourceLocation
+
+@dataclass
+class FunctionCall(Expression):
+    name: str
+    arguments: List[Expression]
+    location: SourceLocation
+
+
 @dataclass
 class AddExpression(Expression):
     left: Expression
@@ -44,17 +62,63 @@ class DivideExpression(Expression):
     location: SourceLocation
 
 @dataclass
-class Literal(Expression):
-    value: Any        
-    type_name: str
+class OrExpression(Expression):
+    left: Expression
+    right: Expression
     location: SourceLocation
 
 @dataclass
-class Variable(Expression):
-    name: str
+class AndExpression(Expression):
+    left: Expression
+    right: Expression
     location: SourceLocation
 
-#statementy
+@dataclass
+class EqualExpression(Expression):
+    left: Expression
+    right: Expression
+    location: SourceLocation
+
+@dataclass
+class NotEqualExpression(Expression):
+    left: Expression
+    right: Expression
+    location: SourceLocation
+
+@dataclass
+class LessExpression(Expression):
+    left: Expression
+    right: Expression
+    location: SourceLocation
+
+@dataclass
+class LessEqualExpression(Expression):
+    left: Expression
+    right: Expression
+    location: SourceLocation
+
+@dataclass
+class GreaterExpression(Expression):
+    left: Expression
+    right: Expression
+    location: SourceLocation
+
+@dataclass
+class GreaterEqualExpression(Expression):
+    left: Expression
+    right: Expression
+    location: SourceLocation
+
+@dataclass
+class UnaryMinusExpression(Expression):
+    operand: Expression
+    location: SourceLocation
+
+@dataclass
+class NotExpression(Expression):
+    operand: Expression
+    location: SourceLocation
+
 
 @dataclass
 class Block(Statement):
@@ -75,11 +139,29 @@ class WhileStatement(Statement):
     location: SourceLocation
 
 @dataclass
+class ReturnStatement(Statement):
+    expression: Optional[Expression]
+    location: SourceLocation
+
+@dataclass
+class AssignmentStatement(Statement):
+    variable_name: str
+    expression: Expression
+    location: SourceLocation
+
+@dataclass
+class FunctionCallStatement(Statement):
+    name: str
+    arguments: List[Expression]
+    location: SourceLocation
+
+@dataclass
 class FunctionDefinition(Statement):
     name: str
     params: List[str]     
     body: Block          
     location: SourceLocation
+
 
 
 @dataclass

@@ -3,11 +3,16 @@ from typing import Optional
 from src.token_type import TokenType
 from src.token import Token
 from src.lexer import Lexer
+
 from src.ast_nodes import (
-    Program, Statement, Expression,
-    BinaryExpression, UnaryExpression, Literal, Variable, FunctionCall,
+    Program, Statement, Expression, SourceLocation,
+    AddExpression, SubtractExpression, MultiplyExpression, DivideExpression,
+    OrExpression, AndExpression, EqualExpression, NotEqualExpression,
+    LessExpression, LessEqualExpression, GreaterExpression, GreaterEqualExpression,
+    UnaryMinusExpression, NotExpression,
+    Literal, Variable, FunctionCall,
     Block, IfStatement, WhileStatement, ReturnStatement, 
-    FunctionDefinition, MatchStatement, FunctionCallStatement, CaseBranch, AssignmentStatement,
+    FunctionDefinition, FunctionCallStatement, AssignmentStatement,
 )
 
 class ParserError(Exception):
@@ -45,43 +50,39 @@ class Parser:
             self.advance()
             return True
         else:
-            self.error(f"{error_message} (Found: {self.current_token.type.name})", str)
-            
+            self.error(f"{error_message} (Found: {self.current_token.type.name})", strategy) # poprawilem str na strategy
             return False
         
     def match(self, *types: TokenType) -> bool:
-        # czy obecny token type jest jednym z podanych typów
-
         return self.current_token.type in types
 
+    def _loc(self) -> SourceLocation:
+        pos = self.current_token.position
+        return SourceLocation(pos.line, pos.column)
 
     def parse_program(self) -> Program:
-        functions = {}
+        functions = {} 
+        start_loc = self._loc() 
 
-        try:
+        while (func_def := self.try_parse_function_definition()):
+            if func_def.name in functions:
+                self.error(f"Function '{func_def.name}' is already defined")
 
-            while (func_def := self.try_parse_function_definition()):
-            
-                if func_def.name in functions:
-                    self.error(f"Function '{func_def.name}' is already defined")
+            functions[func_def.name] = func_def
 
-                functions[func_def.name] = func_def
+        # except ParserError:
+        #     return Program(list(functions.values()), start_loc)
 
-        except ParserError:
-            return Program(functions)
-
-        return Program(functions)
+        return Program(list(functions.values()), start_loc)
 
     
     def try_parse_statement(self) -> Optional[Statement]:
-
         if (stmt := self.try_parse_if_statement()): return stmt
         if (stmt := self.try_parse_while_statement()): return stmt
         if (stmt := self.try_parse_return_statement()): return stmt
         if (stmt := self.try_parse_match_statement()): return stmt
         if (stmt := self.try_parse_block()): return stmt
         
-
         # zmiana - assign lub call jak na wykladzie
         if (stmt := self.try_parse_assign_or_call_statement()): return stmt
 
@@ -89,9 +90,10 @@ class Parser:
 
     # statements
     def try_parse_block(self) -> Optional[Statement]:
-
         if not self.match(TokenType.LBRACE):
             return None
+        
+        loc = self._loc() 
         self.advance() 
 
         stmts = []
@@ -100,11 +102,13 @@ class Parser:
             # self.advance() 
 
         self.consume(TokenType.RBRACE, "Expected '}' after block")
-        return Block(stmts)
+        return Block(stmts, loc) 
 
     def try_parse_if_statement(self) -> Optional[Statement]:
         if not self.match(TokenType.IF):
             return None
+        
+        loc = self._loc() 
         self.advance()
 
         self.consume(TokenType.LPAREN, "Expected '(' after 'if'")
@@ -117,7 +121,6 @@ class Parser:
         then_branch = self.try_parse_block()
 
         if then_branch is None:
-       
             self.error("Expected statement after 'if' condition", strategy="ABORT")
 
         else_branch = None
@@ -127,71 +130,67 @@ class Parser:
             if else_branch is None:
                 self.error("Expected block statement after 'else'", strategy="ABORT")
     
-
-        return IfStatement(condition, then_branch, else_branch)
+        return IfStatement(condition, then_branch, else_branch, loc) 
 
     def try_parse_while_statement(self) -> Optional[Statement]:
-        
         if not self.match(TokenType.WHILE):
             return None
+        
+        loc = self._loc() 
         self.advance()
 
         self.consume(TokenType.LPAREN, "Expected '(' after while")
         if (condition:= self.try_parse_expression()) is None:
             self.error("Expected block in while loop")
         self.consume(TokenType.RPAREN, "need ')'")
-        # musimy sprawdzic czy body istnieje
-
+        
         body = self.try_parse_block()
 
         if body is None:
             self.error("Expected block statement after while", strategy="ABORT")
 
-        # musi byc parse statement, i trzeba umiescic w gramatyce
-        return WhileStatement(condition, body)
+        return WhileStatement(condition, body, loc) 
 
     def try_parse_return_statement(self) -> Optional[Statement]:
         if not self.match(TokenType.RETURN):
             return None
+        
+        loc = self._loc() 
         self.advance()
 
         expr = None
-        # parsujemy wyrażenie gdy nie ma średnika od razu
         if not self.match(TokenType.SEMICOLON):
             expr = self.try_parse_expression()
         
         self.consume(TokenType.SEMICOLON, "Expected ';' after return")
-        return ReturnStatement(expr)
+        return ReturnStatement(expr, loc) 
 
     def try_parse_function_definition(self) -> Optional[FunctionDefinition]:
-
         if self.match(TokenType.EOF):
             return None
         
         if not self.match(TokenType.FUN):
-            self.error(f"Expected function definition (fun) or EOF, found: {self.current_token.type}")
-            raise ParserError("Unexpected token at top level")
+            self.error(f"Expected EOF or definition, found: {self.current_token.type}", strategy="ABORT")
 
+            return None 
+
+        loc = self._loc() 
         self.advance() 
 
-        # Nazwa funkcji 
         if self.match(TokenType.IDENTIFIER):
             name = self.current_token.value 
             self.advance()
         else:
-            self.error("Expected function name")
-            raise ParserError("Expected function name")
+            self.error("Expected function name", strategy="ABORT")
     
         self.consume(TokenType.LPAREN, "Expected '('", )
-        
         params = self._parse_parameter_list()
-        
         self.consume(TokenType.RPAREN, "Expected ')' after parameters")
 
         if (body := self.try_parse_block()) is None:
-                    self.error(f"Expected body for function '{name}'", strategy="ABORT")
+             self.error(f"Expected body for function '{name}'", strategy="ABORT")
         
-        return FunctionDefinition(name, params, body)
+        return FunctionDefinition(name, params, body, loc) 
 
     def _parse_parameter(self) -> str:
         if self.match(TokenType.IDENTIFIER):
@@ -200,10 +199,8 @@ class Parser:
                 return parameter
 
     def _parse_parameter_list(self) -> list[str]:
-
         params = []
-
-        if (parameter := self.parse_parameter()):
+        if (parameter := self._parse_parameter()):
             params.append(parameter)
         else:
             return params
@@ -212,12 +209,9 @@ class Parser:
                 self.advance()
                 if parameter := self._parse_parameter():
                     params.append(parameter)
-
                 else:
                     self.error("Expected parameter name after coma")
         return params
-
-            
 
     def try_parse_match_statement(self) -> Optional[Statement]:
         pass
@@ -225,21 +219,22 @@ class Parser:
     def _parse_case_condition(self):
         pass
 
+   
 
     def try_parse_logic_or(self) -> Optional[Expression]:
         left = self.try_parse_logic_and()
         if left is None: return None
 
-# tokeny nie powinny sie pojawiac w drzewie, 
-# zrobic klase or_expression i tak dalej, 
         while self.match(TokenType.OR):
-            op = self.current_token
+            loc = self._loc() 
             self.advance()
             right = self.try_parse_logic_and()
             if right is None:
                 self.error("need logic_and after 'or'")
                 return left
-            left = BinaryExpression(left, op, right)
+            
+           
+            left = OrExpression(left, right, loc) 
         return left
 
     def try_parse_logic_and(self) -> Optional[Expression]:
@@ -247,13 +242,15 @@ class Parser:
         if left is None: return None
 
         while self.match(TokenType.AND):
-            op = self.current_token
+            loc = self._loc()
             self.advance()
             right = self.try_parse_equality()
             if right is None:
                 self.error("need equality after 'and'")
                 return left
-            left = BinaryExpression(left, op, right)
+            
+           
+            left = AndExpression(left, right, loc)
         return left
 
     def try_parse_equality(self) -> Optional[Expression]:
@@ -261,43 +258,60 @@ class Parser:
         if left is None: return None
 
         while self.match(TokenType.EQUAL, TokenType.NOT_EQUAL):
-            op = self.current_token
+            op_type = self.current_token.type 
+            loc = self._loc()
             self.advance()
             right = self.try_parse_comparison()
             if right is None:
                 self.error("Expected comparison after equality operator")
                 return left
-            left = BinaryExpression(left, op, right)
+            
+            if op_type == TokenType.EQUAL:
+                left = EqualExpression(left, right, loc)
+            else:
+                left = NotEqualExpression(left, right, loc)
         return left
 
     def try_parse_comparison(self) -> Optional[Expression]:
         left = self.try_parse_term()
         if left is None: return None
-# mapowanie typu tokenu operatora na konstruktor obiektu odpowiedniej klasy
-# pytać getem o konstruktor
+
         while self.match(TokenType.GREATER, TokenType.GREATER_EQ, TokenType.LESS, TokenType.LESS_EQ):
-            op = self.current_token
+            op_type = self.current_token.type
+            loc = self._loc()
             self.advance()
             right = self.try_parse_term()
             if right is None:
                 self.error("Expected term after comparison")
                 return left
-            left = BinaryExpression(left, op, right)
+            
+            if op_type == TokenType.LESS:
+                left = LessExpression(left, right, loc)
+            elif op_type == TokenType.LESS_EQ:
+                left = LessEqualExpression(left, right, loc)
+            elif op_type == TokenType.GREATER:
+                left = GreaterExpression(left, right, loc)
+            elif op_type == TokenType.GREATER_EQ:
+                left = GreaterEqualExpression(left, right, loc)
         return left
 
-# ebnf - niefortunne nazwy wewnatrz expression (term/factor)
     def try_parse_term(self) -> Optional[Expression]:
         left = self.try_parse_factor()
         if left is None: return None
 
         while self.match(TokenType.PLUS, TokenType.MINUS):
-            op = self.current_token
+            op_type = self.current_token.type
+            loc = self._loc()
             self.advance()
             right = self.try_parse_factor()
             if right is None:
                 self.error("Expected term after + or -")
                 return left
-            left = BinaryExpression(left, op, right)
+            
+            if op_type == TokenType.PLUS:
+                left = AddExpression(left, right, loc)
+            else:
+                left = SubtractExpression(left, right, loc)
         return left
 
     def try_parse_factor(self) -> Optional[Expression]:
@@ -305,37 +319,45 @@ class Parser:
         if left is None: return None
 
         while self.match(TokenType.MULTIPLY, TokenType.DIVIDE):
-            op = self.current_token
+            op_type = self.current_token.type
+            loc = self._loc()
             self.advance()
             right = self.try_parse_unary()
             if right is None:
                 self.error("Expected unary after * or /")
                 return left
-            left = BinaryExpression(left, op, right)
+            
+            if op_type == TokenType.MULTIPLY:
+                left = MultiplyExpression(left, right, loc)
+            else:
+                left = DivideExpression(left, right, loc)
         return left
 
-# w ebnfie wywolujemy primary tylko raz, a w kodzie 2
     def try_parse_unary(self) -> Optional[Expression]:
-
-        op = None
+        op_type = None
+        loc = None
 
         if self.match(TokenType.NOT, TokenType.MINUS):
-            op = self.current_token
+            op_type = self.current_token.type
+            loc = self._loc() 
             self.advance()
+        
         operand = self.try_parse_primary() 
         if operand is None:
-            if op is not None:
+            if op_type is not None:
                 self.error("Expected expression after not or '-'")
-            
-            #else to nie jest unary expression, czyli po prostu idzie None
             return None
-        if op:
-            return UnaryExpression(op, operand)
+        
+        if op_type:
+            if op_type == TokenType.MINUS:
+                return UnaryMinusExpression(operand, loc)
+            else:
+                return NotExpression(operand, loc)
+                
         return operand
 
 
     def try_parse_primary(self) -> Optional[Expression]:
-
         if (expr := self.parse_call_or_identifier_expression()):
             return expr
         
@@ -343,28 +365,31 @@ class Parser:
             return expr
         
         tt = self.current_token.type
+        loc = self._loc() 
+
         if tt == TokenType.INT_LITERAL:
             val = self.current_token.value
             self.advance()
-            return Literal(val, "int")
+            return Literal(val, "int", loc) 
         elif tt == TokenType.FLOAT_LITERAL:
             val = self.current_token.value
             self.advance()
-            return Literal(val, "float")
+            return Literal(val, "float", loc) 
         elif tt == TokenType.STRING_LITERAL:
             val = self.current_token.value
             self.advance()
-            return Literal(val, "string")
+            return Literal(val, "string", loc) 
         elif tt == TokenType.TRUE:
             self.advance()
-            return Literal(True, "bool")
+            return Literal(True, "bool", loc) 
         elif tt == TokenType.FALSE:
             self.advance()
-            return Literal(False, "bool")
+            return Literal(False, "bool", loc)
 
         return None
 
     def try_parse_assign_or_call_statement(self) -> Optional[Statement]:
+        loc = self._loc() 
 
         if (left := self.parse_call_or_identifier_expression()) is None:
             return None
@@ -380,82 +405,54 @@ class Parser:
 
             self.consume(TokenType.SEMICOLON, "Expected ';' after assignment")
 
-            return AssignmentStatement(left.name, expr)
+            return AssignmentStatement(left.name, expr, loc) 
         
         self.consume(TokenType.SEMICOLON, "Expected ';' after statement")
     
         if isinstance(left, FunctionCall):
-            return FunctionCallStatement(left.name, left.arguments)
+           
+            return FunctionCallStatement(left.name, left.arguments, loc) 
         
         self.error("Statement with no effect", strategy="ABORT")
-
-
-        # # assign
-        # # 
-        # if self.match(TokenType.ASSIGN):
-        #     self.advance()
-        #     expr = self.try_parse_expression()
-        #     if expr is None:
-        #         self.error("Expected expression after assignment")
-        #     self.consume(TokenType.SEMICOLON, "Expected ';'")
-        #     return AssignmentStatement(name, expr)
-        # # powinno byc w osobnej metodzie
-        # # call
-        # elif self.match(TokenType.LPAREN):
-        #     self.advance()
-        #     args = self.parse_argument_list()
-        #     self.consume(TokenType.RPAREN, "Expected ')'")
-        #     self.consume(TokenType.SEMICOLON, "Expected ';'")
-        #     return FunctionCallStatement(FunctionCall(name, args))
-
-        # else:
-        #     self.error("Expected  '=' or  '(' after identifier")
-        #     return None
-
+        return None
 
     def try_parse_expression(self) -> Optional[Expression]:
         return self.try_parse_logic_or()
 
-
     def try_parse_parenthesized_expression(self) -> Optional[Expression]:
-        # srp
         if not self.match(TokenType.LPAREN):
             return None
         
         self.advance() 
-        
         expr = self.try_parse_expression()
         if expr is None:
             self.error("Expected expression inside parentheses")
             
         self.consume(TokenType.RPAREN, "Expected ')'")
-        return expr
+        return expr 
     
-
     def parse_call_or_identifier_expression(self) -> Expression:
         if not self.match(TokenType.IDENTIFIER):
             return None
-
+        
+        loc = self._loc() 
         name = self.current_token.value
         self.advance()
-        # zrobic funkcje parsujace do lparen, i moze zwroci none
+        
         if self.match(TokenType.LPAREN):
             self.advance()
-
-             #Gawk: tu sprwadzamy rparen przed argument list
             args = []
             if not self.match(TokenType.RPAREN):
                 args = self.parse_argument_list()
            
             self.consume(TokenType.RPAREN, "Expected ')'")
-            return FunctionCall(name, args)
+            return FunctionCall(name, args, loc) 
         else:
-            return Variable(name)
+            return Variable(name, loc) 
 
     def parse_argument_list(self) -> list[Expression]:
         args = []
         if arg := self.try_parse_expression():
-
             args.append(arg)
             while self.match(TokenType.COMMA):
                 self.advance()
