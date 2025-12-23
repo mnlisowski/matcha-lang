@@ -9,9 +9,6 @@ from src.ast_nodes import *
 class ParserError(Exception):
     pass
 
-STRATEGY_CONTINUE = "CONTINUE"
-STRATEGY_ABORT = "ABORT"
-
 class Parser:
     def __init__(self, lexer: Lexer, error_handler):
         self.lexer = lexer
@@ -21,7 +18,7 @@ class Parser:
         self.advance()
 
 
-    def advance(self):
+    def advance(self) -> None:
         self.current_token = self.lexer.get_next_token()
         while self.match(TokenType.COMMENT):
             self.current_token = self.lexer.get_next_token()
@@ -82,7 +79,6 @@ class Parser:
 
         return None
 
-    # statements
     def try_parse_block(self) -> Optional[Statement]:
         if not self.match(TokenType.LBRACE):
             return None
@@ -108,7 +104,7 @@ class Parser:
         self.consume(TokenType.LPAREN, "Expected '(' after 'if'")
 
         if (condition:= self.try_parse_expression()) is None:
-            self.error("expression needed in if statement")
+            self.error("expression needed in if statement", strategy="ABORT")
 
         self.consume(TokenType.RPAREN, "Expected ')' after condition")
 
@@ -135,7 +131,7 @@ class Parser:
 
         self.consume(TokenType.LPAREN, "Expected '(' after while")
         if (condition:= self.try_parse_expression()) is None:
-            self.error("Expected block in while loop")
+            self.error("Expected block in while loop") # chyba musi być ze strategy="ABORT"
         self.consume(TokenType.RPAREN, "need ')'")
         
         body = self.try_parse_block()
@@ -155,6 +151,8 @@ class Parser:
         expr = None
         if not self.match(TokenType.SEMICOLON):
             expr = self.try_parse_expression()
+           # if expr is None:
+           #     self.error("Expected expression or semicolon after return", strategy="ABORT")
         
         self.consume(TokenType.SEMICOLON, "Expected ';' after return")
         return ReturnStatement(expr, loc) 
@@ -460,7 +458,7 @@ class Parser:
         loc = self._loc()
         self.advance() 
 
-        subjects = self._parse_match_header()
+        subjects = self.try_parse_match_header()
         
         self.consume(TokenType.LBRACE, "Expected '{' after match header")
 
@@ -490,7 +488,7 @@ class Parser:
 
         return MatchCase(condition, body, loc, is_default)
     
-    def _parse_match_header(self):
+    def try_parse_match_header(self):
         subjects = []
 
         # jeśli jest lbrace, to opcjonalna czesc jest pominięta
@@ -500,7 +498,7 @@ class Parser:
         # 2. Jeśli nie ma lbrace, to musi byc expression albo cos nie tak
         first_expr = self.try_parse_expression()
         if not first_expr:
-            self.error("Expected expression or '{' after 'match'", strategy="ABORT")
+            self.error("Expected expression or '{' after match", strategy="ABORT")
             return []
 
         # Opcjonalny AS 
