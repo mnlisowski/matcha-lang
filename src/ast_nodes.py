@@ -155,13 +155,60 @@ class FunctionCallStatement(Statement):
     arguments: List[Expression]
     location: SourceLocation
 
+class Pattern(ASTNode):
+    """Base class for all patterns in match statement"""
+    pass
+
+@dataclass
+class WildcardPattern(Pattern):
+    location: SourceLocation
+
+@dataclass
+class ConstantPattern(Pattern):
+    value: Expression  
+    location: SourceLocation
+
+@dataclass
+class TypePattern(Pattern):
+    type_name: str
+    location: SourceLocation
+
+@dataclass
+class RelationalPattern(Pattern):
+    op: str 
+    expression: Expression
+    location: SourceLocation
+
+@dataclass
+class AndPattern(Pattern):
+    left: Pattern
+    right: Pattern
+    location: SourceLocation
+
+@dataclass
+class PositionalPattern(Pattern):
+    patterns: List[Pattern]
+    location: SourceLocation
+
+@dataclass
+class MatchCase(ASTNode):
+    condition: Union[Pattern, Expression, None] 
+    body: Statement  
+    location: SourceLocation
+    is_default: bool = False
+
+@dataclass
+class MatchStatement(Statement):
+    subjects: List[Tuple[Expression, Optional[str]]]
+    cases: List[MatchCase]
+    location: SourceLocation
+
 @dataclass
 class FunctionDefinition(Statement):
     name: str
     params: List[str]     
     body: Block          
     location: SourceLocation
-
 
 
 @dataclass

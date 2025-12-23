@@ -4,16 +4,7 @@ from src.token_type import TokenType
 from src.token import Token
 from src.lexer import Lexer
 
-from src.ast_nodes import (
-    Program, Statement, Expression, SourceLocation,
-    AddExpression, SubtractExpression, MultiplyExpression, DivideExpression,
-    OrExpression, AndExpression, EqualExpression, NotEqualExpression,
-    LessExpression, LessEqualExpression, GreaterExpression, GreaterEqualExpression,
-    UnaryMinusExpression, NotExpression,
-    Literal, Variable, FunctionCall,
-    Block, IfStatement, WhileStatement, ReturnStatement, 
-    FunctionDefinition, FunctionCallStatement, AssignmentStatement,
-)
+from src.ast_nodes import *
 
 class ParserError(Exception):
     pass
@@ -29,8 +20,11 @@ class Parser:
         
         self.advance()
 
+
     def advance(self):
         self.current_token = self.lexer.get_next_token()
+        while self.match(TokenType.COMMENT):
+            self.current_token = self.lexer.get_next_token()
 
     def error(self, message: str, strategy: str = "CONTINUE"):
         if self.current_token:
@@ -50,7 +44,7 @@ class Parser:
             self.advance()
             return True
         else:
-            self.error(f"{error_message} (Found: {self.current_token.type.name})", strategy) # poprawilem str na strategy
+            self.error(f"{error_message} (Found: {self.current_token.type.name})", strategy) 
             return False
         
     def match(self, *types: TokenType) -> bool:
@@ -213,11 +207,7 @@ class Parser:
                     self.error("Expected parameter name after coma")
         return params
 
-    def try_parse_match_statement(self) -> Optional[Statement]:
-        pass
 
-    def _parse_case_condition(self):
-        pass
 
    
 
@@ -462,3 +452,230 @@ class Parser:
                 else:
                     self.error("Expected expression after comma")
         return args
+    
+    def try_parse_match_statement(self) -> Optional[Statement]:
+        if not self.match(TokenType.MATCH):
+            return None
+        
+        loc = self._loc()
+        self.advance() 
+
+        subjects = self._parse_match_header()
+        
+        self.consume(TokenType.LBRACE, "Expected '{' after match header")
+
+        cases = []
+        while (case_branch := self.try_parse_case_branch()):
+            cases.append(case_branch)
+
+        self.consume(TokenType.RBRACE, "Expected '}' after match cases")
+
+        return MatchStatement(subjects, cases, loc)
+
+    def try_parse_case_branch(self) -> Optional[MatchCase]:
+        if (condition_result := self.try_parse_case_condition()) is None:
+            return None
+
+        loc = self._loc()
+        condition, is_default = condition_result
+
+        self.consume(TokenType.ARROW, "Expected '=>' after case condition")
+
+        if (body := self.try_parse_block()) is None:
+            self.error("Need block statement in match case body", strategy="ABORT")
+            return None
+
+        if self.match(TokenType.COMMA):
+            self.advance()
+
+        return MatchCase(condition, body, loc, is_default)
+    
+    def _parse_match_header(self):
+        subjects = []
+
+        # jeśli jest lbrace, to opcjonalna czesc jest pominięta
+        if self.match(TokenType.LBRACE):
+            return subjects  
+
+        # 2. Jeśli nie ma lbrace, to musi byc expression albo cos nie tak
+        first_expr = self.try_parse_expression()
+        if not first_expr:
+            self.error("Expected expression or '{' after 'match'", strategy="ABORT")
+            return []
+
+        # Opcjonalny AS 
+        alias = None
+        if self.match(TokenType.AS):
+            self.advance()
+            if self.match(TokenType.IDENTIFIER):
+                alias = self.current_token.value
+                self.advance()
+            else:
+                self.error("Expected identifier after 'as'", strategy="ABORT")
+        
+        subjects.append((first_expr, alias))
+
+        while self.match(TokenType.COMMA):
+            self.advance()
+            
+            expr = self.try_parse_expression()
+            if not expr:
+                self.error("Expected expression after comma in match header", strategy="ABORT")
+            
+            alias = None
+            if self.match(TokenType.AS):
+                self.advance()
+                if self.match(TokenType.IDENTIFIER):
+                    alias = self.current_token.value
+                    self.advance()
+                else:
+                    self.error("Expected identifier after 'as'", strategy="ABORT")
+            
+            subjects.append((expr, alias))
+            
+        return subjects
+
+    def try_parse_case_condition(self):
+       
+        if (pattern := self.try_parse_positional_pattern()):
+            return pattern, False
+       
+        if (expr := self.try_parse_expression()):
+            return expr, False
+       
+        if self.match(TokenType.DEFAULT):
+            self.advance()
+            return None, True 
+        
+        return None
+      
+        
+    def try_parse_positional_pattern(self):
+        if not self.match(TokenType.LBRACKET):
+            return None
+        
+        loc = self._loc()
+        self.advance() 
+
+        patterns = []
+        
+        # Sprawdzamy, czy lista nie jest pusta, w sumie nie wiem po co w ebnf pattern_list mamy opcjonalny 
+        if not self.match(TokenType.RBRACKET):
+            patterns = self.try_parse_pattern_list()
+
+        self.consume(TokenType.RBRACKET, "Expected ']' after pattern list")
+        
+        return PositionalPattern(patterns, loc)
+    
+    def try_parse_pattern_list(self):
+        patterns = []
+        
+        if first := self.try_parse_and_pattern():
+            patterns.append(first)
+        else:
+            self.error("Expected pattern in pattern list", strategy="ABORT") # nie jestem pewien czy trzeba
+        
+        while self.match(TokenType.COMMA):
+            self.advance()
+            if nxt:= self.try_parse_and_pattern():
+                patterns.append(nxt)
+            else:
+                self.error("Expected pattern after comma", strategy="ABORT") # tez chyba nie trzeba
+        
+        return patterns
+    
+    def try_parse_and_pattern(self):
+        left = self.try_parse_single_pattern()
+        if not left:
+            return None
+   
+        while self.match(TokenType.AND_PATTERN): 
+            loc = self._loc()
+            self.advance()
+            right = self.try_parse_single_pattern()
+            if not right:
+                self.error("Expected pattern after 'AND'", strategy="ABORT")
+                return left 
+            
+            left = AndPattern(left, right, loc)
+            
+        return left
+   
+    def try_parse_single_pattern(self) -> Optional[Pattern]:
+        # Wildcard (_)
+        if (pat := self.try_parse_wildcard_pattern()):
+            return pat
+
+        # Type Pattern (is int)
+        if (pat := self.try_parse_type_pattern()):
+            return pat
+
+        # Relational Pattern (> 5)
+        if (pat := self.try_parse_relational_pattern()):
+            return pat
+
+        # Constant Pattern (10, "hello")
+        if (pat := self.try_parse_constant_pattern()):
+            return pat
+            
+        return None
+    
+    
+    def try_parse_wildcard_pattern(self):
+        if not self.match(TokenType.WILDCARD):
+            return None
+            
+        loc = self._loc()
+        self.advance()
+        return WildcardPattern(loc)
+
+    def try_parse_type_pattern(self) -> Optional[TypePattern]:
+        if not self.match(TokenType.IS):
+            return None
+
+        loc = self._loc()
+        self.advance() 
+        
+        if self.match(TokenType.TYPE_INT, TokenType.TYPE_FLT, 
+                      TokenType.TYPE_STR, TokenType.TYPE_BOOL):
+            type_name = self.current_token.value 
+            self.advance()
+            return TypePattern(type_name, loc)
+        
+        self.error("Expected type name after 'is'", strategy="ABORT")
+        return None
+
+    def try_parse_relational_pattern(self):
+        OP_MAP = {
+            TokenType.GREATER: ">",
+            TokenType.LESS: "<",
+            TokenType.GREATER_EQ: ">=",
+            TokenType.LESS_EQ: "<=",
+            TokenType.EQUAL: "==",
+            TokenType.NOT_EQUAL: "!="
+        }
+
+        if self.current_token.type not in OP_MAP:
+            return None
+
+        loc = self._loc()
+        op_str = OP_MAP[self.current_token.type] 
+        
+        self.advance() 
+
+        if (expr := self.try_parse_expression()) is None:
+            self.error("Expected expression in relational pattern", strategy="ABORT")
+            
+        return RelationalPattern(op_str, expr, loc)
+
+    def try_parse_constant_pattern(self):
+    
+        if not self.match(TokenType.INT_LITERAL, TokenType.FLOAT_LITERAL, 
+                          TokenType.STRING_LITERAL, TokenType.TRUE, TokenType.FALSE):
+            return None
+
+        loc = self._loc()
+        lit = self.try_parse_primary() 
+        return ConstantPattern(lit, loc)
+    
+   
