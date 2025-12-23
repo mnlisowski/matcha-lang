@@ -16,10 +16,13 @@ def dump_ast(node, level=0):
         return
 
     print(f"{indent}{type(node).__name__}")
+
+    if hasattr(node, 'location'):
+        print(f"{indent}  .location: {repr(getattr(node, 'location'))}")
     
     for key, value in vars(node).items():
-        # if key == 'location': 
-        #     continue
+        if key == 'location': 
+           continue
             
         # pomijamy np brak else w ifie
         if value is None:
