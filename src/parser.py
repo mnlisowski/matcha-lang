@@ -22,7 +22,11 @@ class Parser:
         self.current_token = self.lexer.get_next_token()
         while self.match(TokenType.COMMENT):
             self.current_token = self.lexer.get_next_token()
-
+# powinna być klasa od błędu parsera, różna dla sytuacji, i ona powinna opisywac sytuacje
+# nie powinno byc odpowiedzialnoscia errora zeby rzucic wyjatek
+# rzucanie wyjatkow nie w metodzie ukrytej, tylko jawnie przy pkazdym przypadku !! kazdy wyjatek rzucamy jawnie, i skonstruowac hierarchie wyjatkow dla rozny
+#ch sytuacji
+# nawet jelsi uzylem stringa to trzeba zrobic enumeracje
     def error(self, message: str, strategy: str = "CONTINUE"):
         if self.current_token:
             pos = self.current_token.position
@@ -57,22 +61,38 @@ class Parser:
 
         while (func_def := self.try_parse_function_definition()):
             if func_def.name in functions:
+                # tu dostaniemy koncowa pozycje, a interesuje nas pozycja definicji funkcji
                 self.error(f"Function '{func_def.name}' is already defined")
 
             functions[func_def.name] = func_def
 
         # except ParserError:
         #     return Program(list(functions.values()), start_loc)
+        if self.match(TokenType.EOF):
+            return Program(list(functions.values()), start_loc)
 
-        return Program(list(functions.values()), start_loc)
+        self.error(f"No eof after all ddefinitions", strategy="ABORT")
 
-    
+    def try_parse_break(self) -> Optional[Statement]:
+
+        if not self.match(TokenType.BREAK):
+            return None
+        loc = self._loc()
+        self.advance()
+       
+        self.consume(TokenType.SEMICOLON, "expected semicolon after Break")
+
+        return BreakStatement(loc)
+
+#continue dopisac
+#refaktoryzacja wszystkich ifów do zwyklych returnow i seria trajów
     def try_parse_statement(self) -> Optional[Statement]:
         if (stmt := self.try_parse_if_statement()): return stmt
         if (stmt := self.try_parse_while_statement()): return stmt
         if (stmt := self.try_parse_return_statement()): return stmt
         if (stmt := self.try_parse_match_statement()): return stmt
         if (stmt := self.try_parse_block()): return stmt
+        if (stmt := self.try_parse_break()): return stmt
         
         # zmiana - assign lub call jak na wykladzie
         if (stmt := self.try_parse_assign_or_call_statement()): return stmt
@@ -158,13 +178,10 @@ class Parser:
         return ReturnStatement(expr, loc) 
 
     def try_parse_function_definition(self) -> Optional[FunctionDefinition]:
-        if self.match(TokenType.EOF):
-            return None
         
         if not self.match(TokenType.FUN):
-            self.error(f"Expected EOF or definition, found: {self.current_token.type}", strategy="ABORT")
+            return None
 
-            return None 
 
         loc = self._loc() 
         self.advance() 
@@ -202,7 +219,7 @@ class Parser:
                 if parameter := self._parse_parameter():
                     params.append(parameter)
                 else:
-                    self.error("Expected parameter name after coma")
+                    self.error("Expected parameter name after comma")
         return params
 
 
@@ -263,7 +280,9 @@ class Parser:
     def try_parse_comparison(self) -> Optional[Expression]:
         left = self.try_parse_term()
         if left is None: return None
+# zrobić mape z odpowiednich tokenów, i pytać mapę o konstruktor. w while'u robić geta
 
+            
         while self.match(TokenType.GREATER, TokenType.GREATER_EQ, TokenType.LESS, TokenType.LESS_EQ):
             op_type = self.current_token.type
             loc = self._loc()
@@ -355,6 +374,7 @@ class Parser:
         tt = self.current_token.type
         loc = self._loc() 
 
+# ! dorobić klase dla każðego typu literału w drzewie
         if tt == TokenType.INT_LITERAL:
             val = self.current_token.value
             self.advance()
@@ -470,6 +490,7 @@ class Parser:
 
         return MatchStatement(subjects, cases, loc)
 
+# coma powinna byc na koniec kazdego kejsa, zmienic ebnfa
     def try_parse_case_branch(self) -> Optional[MatchCase]:
         if (condition_result := self.try_parse_case_condition()) is None:
             return None

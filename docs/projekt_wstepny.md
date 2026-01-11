@@ -358,6 +358,7 @@ Gramatyka jest podzielona na część leksykalną  i składniową
 ```ebnf
 #  Słowa Kluczowe
 FUN               ::= "fun"
+BREAK             ::= "break"
 RETURN            ::= "return"
 VAR               ::= "var"
 IF                ::= "if"
@@ -426,6 +427,7 @@ statement           ::== match_statement
                      |   expression_statement
                      |   block_statement
                      |   assign_or_call_statement
+                     |   break_statement
                      ;
 
 block_statement     ::== LBRACE { statement } RBRACE
@@ -439,6 +441,7 @@ while_statement     ::== WHILE LPAREN expression RPAREN block_statement
 return_statement    ::== RETURN [ expression ] SEMICOLON
 assign_or_call_statement ::== call_or_identifier [ ASSIGN expression ] SEMICOLON 
 expression_statement::== expression SEMICOLON
+break_statement     ::== BREAK SEMICOLON
 
 #  Instrukcja 'match'
 match_statement     ::== MATCH match_header LBRACE { case_branch } RBRACE

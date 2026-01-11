@@ -4,6 +4,7 @@ from enum import Enum, auto
 class TokenType(Enum):
     # Słowa Kluczowe
     FUN = auto()
+    BREAK = auto()
     RETURN = auto()
     VAR = auto()
     IF = auto()

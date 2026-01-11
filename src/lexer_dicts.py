@@ -2,6 +2,7 @@ from src.token_type import TokenType
 
 KEYWORDS = {
     "fun": TokenType.FUN,
+    "break": TokenType.BREAK,
     "return": TokenType.RETURN,
     "var": TokenType.VAR,
     "if": TokenType.IF,

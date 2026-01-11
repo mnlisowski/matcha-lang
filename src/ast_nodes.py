@@ -1,5 +1,9 @@
+# # ! dorobić klasy dla każðego typu literału w drzewie
+
 from dataclasses import dataclass
 from typing import List, Optional, Any, Union, Tuple
+from abc import ABC, abstractmethod
+# from __future__ import annotations
 
 @dataclass
 class SourceLocation:
@@ -17,6 +21,7 @@ class Statement(ASTNode):
 
 class Expression(ASTNode):
     pass
+
 
 
 @dataclass
@@ -141,6 +146,10 @@ class WhileStatement(Statement):
 @dataclass
 class ReturnStatement(Statement):
     expression: Optional[Expression]
+    location: SourceLocation
+
+@dataclass 
+class BreakStatement(Statement):
     location: SourceLocation
 
 @dataclass
