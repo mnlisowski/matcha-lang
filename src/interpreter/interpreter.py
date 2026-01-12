@@ -9,7 +9,7 @@ class BreakException(Exception):
 class ReturnException(Exception):
     def __init__(self, value: Any):
         self.value = value
-        super().__init__()
+        
 
 class RuntimeError(Exception):
     def __init__(self, message: str, location: Optional[SourceLocation]):
@@ -50,6 +50,7 @@ class Interpreter(Visitor):
         self.build_builtins()
 
         self.environment = self.globals
+        self.current_subject = None
 
     def build_builtins(self):
         self.builtins["print"] = self._builtin_print
@@ -69,15 +70,6 @@ class Interpreter(Visitor):
         return input()
     
     def _builtin_typeof(self, value):
-        """
-        typeof(x) - zwraca typ wartości jako string.
-        
-        Mapowanie Python -> Matcha:
-        - bool -> "bool"
-        - int -> "int"
-        - float -> "float"
-        - str -> "string"
-        """
         if isinstance(value, bool): #isinstance(True,int) zwraca true, wiec przed
             return "bool"
         elif isinstance(value, int):
@@ -518,11 +510,12 @@ class Interpreter(Visitor):
             if alias:
                 match_env.define(alias, val)
         
-        self.environment = match_env
+        
         
         # Zapisujemy scope (bo zagniezdzenia matchy)
-        old_match_values = getattr(self, 'match_values', None)
-        self.match_values = values 
+        match_env.define("$match_targets", values)
+
+        self.environment = match_env
         
         try:
             matched_any = False
@@ -547,7 +540,6 @@ class Interpreter(Visitor):
             
         finally:
             self.environment = previous_env
-            self.match_values = old_match_values
 
         return None
 
@@ -571,28 +563,28 @@ class Interpreter(Visitor):
 
   
     def visit_PositionalPattern(self, node: PositionalPattern):
-        if len(node.patterns) != len(self.match_values):
+
+        match_values = self.environment.get("$match_targets")
+        
+        if len(node.patterns) != len(match_values):
             raise RuntimeError(
-                f"Pattern count mismatch. Expected {len(self.match_values)}, "
+                f"Pattern count not matching. Expected {len(self.match_values)}, "
                 f"got {len(node.patterns)}",
                 node.location
             )
         
-        for pattern, value in zip(node.patterns, self.match_values):
+        for pattern, value in zip(node.patterns, match_values):
             
-            self.current_subject = value
-            
-            try:
-                # Jeśli którykolwiek wzorzec nie pasuje, to calosc nie pasuje
-                if not pattern.accept(self):
-                    return False
-            finally:
-                pass
+            self.environment.define("$current_subject", value)
+            # Jeśli którykolwiek wzorzec nie pasuje, to calosc nie pasuje
+            if not pattern.accept(self):
+                return False
                 
         return True
 
     def visit_RelationalPattern(self, node: RelationalPattern):
-        val = self.current_subject
+        val = self.environment.get("$current_subject")
+        
         comp_val = node.expression.accept(self) 
         if type(val) != type(comp_val):
            #albo false albo rzucamy wyjatek
@@ -608,7 +600,7 @@ class Interpreter(Visitor):
         return False
 
     def visit_TypePattern(self, node: TypePattern):
-        val = self.current_subject
+        val = self.environment.get("$current_subject")
         t = node.type_name
         
     
@@ -626,7 +618,7 @@ class Interpreter(Visitor):
         return False
 
     def visit_ConstantPattern(self, node: ConstantPattern):
-        val = self.current_subject
+        val = self.environment.get("$current_subject")
         pattern_val = node.value.accept(self)
         return val == pattern_val
 
