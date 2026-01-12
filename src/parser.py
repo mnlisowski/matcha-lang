@@ -1,10 +1,10 @@
 from typing import Optional
 
-from src.token_type import TokenType
-from src.token import Token
-from src.lexer import Lexer
+from .token_type import TokenType
+from .token import Token
+from .lexer import Lexer
 
-from src.ast_nodes import *
+from .ast_nodes import *
 
 class ParserError(Exception):
     pass
@@ -657,7 +657,17 @@ class Parser:
         
         if self.match(TokenType.TYPE_INT, TokenType.TYPE_FLT, 
                       TokenType.TYPE_STR, TokenType.TYPE_BOOL):
-            type_name = self.current_token.value 
+            tt = self.current_token.type
+            if tt == TokenType.TYPE_INT:
+                type_name = "int"
+            elif tt == TokenType.TYPE_FLT:
+                type_name = "float"
+            elif tt == TokenType.TYPE_STR:
+                type_name = "string"
+            elif tt == TokenType.TYPE_BOOL:
+                type_name = "bool"
+            else:
+                type_name = "unknown"
             self.advance()
             return TypePattern(type_name, loc)
         
