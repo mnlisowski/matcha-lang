@@ -1,4 +1,4 @@
-from src.position import Position
+from .position import Position
 
 EOF = "\4"
 

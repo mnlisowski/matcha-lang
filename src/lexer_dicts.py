@@ -1,4 +1,4 @@
-from src.token_type import TokenType
+from .token_type import TokenType
 
 KEYWORDS = {
     "fun": TokenType.FUN,

@@ -1,7 +1,7 @@
-from src.reader import CharReader, EOF
-from src.token import Token
-from src.token_type import TokenType
-from src.lexer_dicts import KEYWORDS, SINGLE_CHAR_TOKENS, DOUBLE_CHAR_TOKENS
+from .reader import CharReader, EOF
+from .token import Token
+from .token_type import TokenType
+from .lexer_dicts import KEYWORDS, SINGLE_CHAR_TOKENS, DOUBLE_CHAR_TOKENS
 
 
 class Lexer:

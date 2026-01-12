@@ -1,5 +1,5 @@
-from src.token_type import TokenType
-from src.position import Position
+from .token_type import TokenType
+from .position import Position
 
 
 class Token:
