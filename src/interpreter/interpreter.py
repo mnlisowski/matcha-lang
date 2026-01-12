@@ -228,7 +228,6 @@ class Interpreter(Visitor):
                 node.location
             )
         
-        # Tylko int lub float, bez stringa
         if isinstance(left, (int, float)):
             return left - right
         
@@ -506,3 +505,133 @@ class Interpreter(Visitor):
     def visit_BreakStatement(self, node: BreakStatement):
         raise BreakException()
     
+    def visit_MatchStatement(self, node: MatchStatement):
+        previous_env = self.environment
+        
+        # 1. Tworzymy scope dla aliasów
+        match_env = Environment(parent=previous_env)
+        
+        values = []
+        for expr, alias in node.subjects:
+            val = expr.accept(self)
+            values.append(val)
+            if alias:
+                match_env.define(alias, val)
+        
+        self.environment = match_env
+        
+        # Zapisujemy scope (bo zagniezdzenia matchy)
+        old_match_values = getattr(self, 'match_values', None)
+        self.match_values = values 
+        
+        try:
+            matched_any = False
+            default_case = None
+            
+            # iteruje po kejsach bez default
+            for case in node.cases:
+                if case.is_default:
+                    default_case = case
+                    continue 
+                
+                # Sprawdzam dopasowanie
+                is_match = case.accept(self)
+                
+                if is_match:
+                    matched_any = True
+                    case.body.accept(self)
+
+            
+            if not matched_any and default_case:
+                default_case.body.accept(self)
+            
+        finally:
+            self.environment = previous_env
+            self.match_values = old_match_values
+
+        return None
+
+    def visit_MatchCase(self, node: MatchCase):
+        if node.is_default:
+            return True 
+                        
+        if node.condition is None:
+             return True
+        
+        if isinstance(node.condition, Pattern):
+            return node.condition.accept(self)
+        
+        elif isinstance(node.condition, Expression):
+            result = node.condition.accept(self)
+            if not isinstance(result, bool):
+                 raise TypeError(f"Match condition must be bool, got {type(result).__name__}", node.location)
+            return result
+            
+        return False
+
+  
+    def visit_PositionalPattern(self, node: PositionalPattern):
+        if len(node.patterns) != len(self.match_values):
+            raise RuntimeError(
+                f"Pattern count mismatch. Expected {len(self.match_values)}, "
+                f"got {len(node.patterns)}",
+                node.location
+            )
+        
+        for pattern, value in zip(node.patterns, self.match_values):
+            
+            self.current_subject = value
+            
+            try:
+                # Jeśli którykolwiek wzorzec nie pasuje, to calosc nie pasuje
+                if not pattern.accept(self):
+                    return False
+            finally:
+                pass
+                
+        return True
+
+    def visit_RelationalPattern(self, node: RelationalPattern):
+        val = self.current_subject
+        comp_val = node.expression.accept(self) 
+        if type(val) != type(comp_val):
+           #albo false albo rzucamy wyjatek
+             return False 
+
+        if node.op == ">": return val > comp_val
+        if node.op == "<": return val < comp_val
+        if node.op == ">=": return val >= comp_val
+        if node.op == "<=": return val <= comp_val
+        if node.op == "==": return val == comp_val
+        if node.op == "!=": return val != comp_val
+        
+        return False
+
+    def visit_TypePattern(self, node: TypePattern):
+        val = self.current_subject
+        t = node.type_name
+        
+    
+        t = str(t)
+
+        if t == "int": 
+            return isinstance(val, int) and not isinstance(val, bool)
+        if t == "float": 
+            return isinstance(val, float)
+        if t == "string": 
+            return isinstance(val, str)
+        if t == "bool": 
+            return isinstance(val, bool)
+            
+        return False
+
+    def visit_ConstantPattern(self, node: ConstantPattern):
+        val = self.current_subject
+        pattern_val = node.value.accept(self)
+        return val == pattern_val
+
+    def visit_WildcardPattern(self, node: WildcardPattern):
+        return True
+
+    def visit_AndPattern(self, node: AndPattern):
+        return node.left.accept(self) and node.right.accept(self)
