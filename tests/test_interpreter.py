@@ -1,8 +1,8 @@
 import unittest
 import io
-from src.reader import CharReader
-from src.lexer import Lexer
-from src.parser import Parser
+from src.lexer.reader import CharReader
+from src.lexer.lexer import Lexer
+from src.parser.parser import Parser
 from src.interpreter.interpreter import (
     Interpreter,
     RuntimeError as InterpreterRuntimeError,
@@ -10,33 +10,33 @@ from src.interpreter.interpreter import (
     NameError as InterpreterNameError,
     ValueError as InterpreterValueError,
 )
-from src.ast_nodes import *
+from src.ast.ast_nodes import *
 
 
 class TestInterpreter(unittest.TestCase):
-    
     def run_code(self, source_code: str, function_name: str = None, *args):
         stream = io.StringIO(source_code)
         reader = CharReader(stream)
         lexer = Lexer(reader)
-        
+
         parser_errors = []
+
         def error_handler(msg):
             parser_errors.append(msg)
-        
+
         parser = Parser(lexer, error_handler)
         program_ast = parser.parse_program()
-        
+
         if parser_errors:
             raise Exception(f"Parser errors: {parser_errors}")
-        
+
         interpreter = Interpreter()
         program_ast.accept(interpreter)
-        
+
         if function_name:
             arg_nodes = []
             dummy_loc = SourceLocation(0, 0)
-            
+
             for arg in args:
                 if isinstance(arg, bool):
                     arg_nodes.append(BoolLiteral(arg, dummy_loc))
@@ -48,15 +48,11 @@ class TestInterpreter(unittest.TestCase):
                     arg_nodes.append(StringLiteral(arg, dummy_loc))
                 else:
                     raise ValueError(f"Unsupported argument type: {type(arg)}")
-            
-            call_node = FunctionCall(
-                function_name,
-                arg_nodes,
-                dummy_loc
-            )
-            
+
+            call_node = FunctionCall(function_name, arg_nodes, dummy_loc)
+
             return interpreter.interpret(call_node)
-        
+
         return None
 
     def test_simple_addition(self):
@@ -66,7 +62,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 8)
-    
+
     def test_simple_subtraction(self):
         code = """
         fun test() {
@@ -74,7 +70,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertAlmostEqual(self.run_code(code, "test"), 7.0)
-    
+
     def test_multiplication(self):
         code = """
         fun test() {
@@ -82,7 +78,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 20)
-    
+
     def test_division(self):
         code = """
         fun test() {
@@ -90,7 +86,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 5.0)
-    
+
     def test_string_concatenation(self):
         code = """
         fun test() {
@@ -98,16 +94,15 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), "hello world")
-    
+
     def test_complex_arithmetic(self):
-      
         code = """
         fun test() {
             return 2.0 + 3.0 * 4.0 - 10.0 / 2.0;
         }
         """
         self.assertEqual(self.run_code(code, "test"), 9.0)
-    
+
     def test_unary_minus(self):
         code = """
         fun test() {
@@ -116,7 +111,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), -10)
-    
+
     def test_error_add_int_float(self):
         code = """
         fun test() {
@@ -126,7 +121,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterTypeError) as ctx:
             self.run_code(code, "test")
         self.assertIn("Cannot perform '+'", str(ctx.exception))
-    
+
     def test_error_add_int_string(self):
         code = """
         fun test() {
@@ -136,7 +131,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterTypeError) as ctx:
             self.run_code(code, "test")
         self.assertIn("Cannot perform '+'", str(ctx.exception))
-    
+
     def test_error_multiply_string(self):
         code = """
         fun test() {
@@ -146,7 +141,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterTypeError) as ctx:
             self.run_code(code, "test")
         self.assertIn("Operator '*' requires", str(ctx.exception))
-    
+
     def test_error_divide_by_zero(self):
         code = """
         fun test() {
@@ -156,7 +151,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterValueError) as ctx:
             self.run_code(code, "test")
         self.assertIn("Division by zero", str(ctx.exception))
-    
+
     def test_error_compare_different_types(self):
         code = """
         fun test() {
@@ -166,7 +161,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterTypeError) as ctx:
             self.run_code(code, "test")
         self.assertIn("Cannot perform", str(ctx.exception))
-    
+
     def test_error_unary_minus_on_string(self):
         code = """
         fun test() {
@@ -176,7 +171,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterTypeError) as ctx:
             self.run_code(code, "test")
         self.assertIn("requires numeric type", str(ctx.exception))
-    
+
     def test_comparison_operators(self):
         code = """
         fun test() {
@@ -189,7 +184,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertTrue(self.run_code(code, "test"))
-    
+
     def test_equality_operators(self):
         code = """
         fun test() {
@@ -200,7 +195,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertTrue(self.run_code(code, "test"))
-    
+
     def test_logical_and_short_circuit(self):
         code = """
         fun test() {
@@ -212,7 +207,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 2)
-    
+
     def test_logical_or_short_circuit(self):
         code = """
         fun test() {
@@ -224,7 +219,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 1)
-    
+
     def test_variable_assignment_and_retrieval(self):
         code = """
         fun test() {
@@ -233,7 +228,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 42)
-    
+
     def test_variable_reassignment(self):
         code = """
         fun test() {
@@ -244,7 +239,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 15)
-    
+
     def test_block_scope(self):
         code = """
         fun test() {
@@ -256,7 +251,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 20)
-    
+
     def test_nested_blocks_scope(self):
         code = """
         fun test() {
@@ -271,7 +266,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 3)
-    
+
     def test_error_undefined_variable(self):
         code = """
         fun test() {
@@ -281,7 +276,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterNameError) as ctx:
             self.run_code(code, "test")
         self.assertIn("Undefined variable", str(ctx.exception))
-    
+
     def test_if_else_statement(self):
         code = """
         fun test() {
@@ -294,7 +289,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 1)
-    
+
     def test_while_loop_sum(self):
         code = """
         fun test() {
@@ -308,7 +303,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 10)
-    
+
     def test_nested_while_loops(self):
         code = """
         fun test() {
@@ -326,7 +321,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 6)
-    
+
     def test_function_call_simple(self):
         code = """
         fun add(a, b) {
@@ -338,7 +333,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 7)
-    
+
     def test_recursive_factorial(self):
         code = """
         fun factorial(n) {
@@ -349,7 +344,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "factorial", 5), 120)
-    
+
     def test_function_return_without_value(self):
         code = """
         fun test() {
@@ -357,7 +352,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertIsNone(self.run_code(code, "test"))
-    
+
     def test_error_undefined_function(self):
         code = """
         fun test() {
@@ -366,7 +361,7 @@ class TestInterpreter(unittest.TestCase):
         """
         with self.assertRaises(InterpreterNameError):
             self.run_code(code, "test")
-    
+
     def test_error_wrong_number_of_arguments(self):
         code = """
         fun add(a, b) {
@@ -379,7 +374,7 @@ class TestInterpreter(unittest.TestCase):
         with self.assertRaises(InterpreterRuntimeError) as ctx:
             self.run_code(code, "test")
         self.assertIn("expects 2 arguments", str(ctx.exception))
-    
+
     def test_builtin_typeof(self):
         code = """
         fun test() {
@@ -387,7 +382,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), "int")
-        
+
     def test_complex_program_calculator(self):
         # Program używa floatów, aby uniknąć błędów typowania przy sumowaniu
         # wyniku dzielenia (float) z resztą wyników.
@@ -425,7 +420,7 @@ class TestInterpreter(unittest.TestCase):
         """
         # 15.0 + 5.0 + 50.0 + 2.0 = 72.0
         self.assertEqual(self.run_code(code, "test"), 72.0)
-    
+
     def test_complex_program_nested_loops_pattern(self):
         code = """
         fun test() {
@@ -533,7 +528,7 @@ class TestInterpreter(unittest.TestCase):
         }
         """
         self.assertEqual(self.run_code(code, "test"), 2)
-    
+
     def test_match_alias_usage_in_body(self):
         code = """
         fun test() {
@@ -658,5 +653,5 @@ class TestInterpreter(unittest.TestCase):
         self.assertEqual(self.run_code(code, "test"), 5)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

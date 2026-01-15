@@ -1,21 +1,20 @@
-from .reader import CharReader, EOF
-from .token import Token
-from .token_type import TokenType
-from .lexer_dicts import KEYWORDS, SINGLE_CHAR_TOKENS, DOUBLE_CHAR_TOKENS
+from src.lexer.reader import EOF
+from src.lexer.token import Token
+from src.lexer.token_type import TokenType
+from src.lexer.lexer_dicts import KEYWORDS, SINGLE_CHAR_TOKENS, DOUBLE_CHAR_TOKENS
+
 
 class LexerError(Exception):
-    
     def __init__(self, message, position):
         self.message = message
         self.position = position
         super().__init__(f"{message} at {position}")
-    
+
     def __str__(self):
         return f"Błąd leksykalny {self.position}: {self.message}"
 
 
 class HardLimitError(LexerError):
-    
     def __init__(self, element_type, limit, position):
         message = f"{element_type} exceeded hard limit ({limit})"
         super().__init__(message, position)
@@ -24,7 +23,6 @@ class HardLimitError(LexerError):
 
 
 class InvalidCharacterError(LexerError):
-    
     def __init__(self, char, position):
         message = f"Unexpected character '{char}'"
         super().__init__(message, position)
@@ -32,14 +30,12 @@ class InvalidCharacterError(LexerError):
 
 
 class UnterminatedStringError(LexerError):
-    
     def __init__(self, position):
         message = "Unterminated string literal"
         super().__init__(message, position)
 
 
 class InvalidEscapeSequenceError(LexerError):
-    
     def __init__(self, escape_char, position):
         message = f"Invalid escape sequence '\\{escape_char}'"
         super().__init__(message, position)
@@ -47,7 +43,6 @@ class InvalidEscapeSequenceError(LexerError):
 
 
 class IntegerOverflowError(LexerError):
-    
     def __init__(self, value, max_value, position):
         message = f"Integer overflow: {value} exceeds ({max_value})"
         super().__init__(message, position)
@@ -56,12 +51,11 @@ class IntegerOverflowError(LexerError):
 
 
 class SoftLimitWarning:
-    
     def __init__(self, element_type, limit, position):
         self.element_type = element_type
         self.limit = limit
         self.position = position
-    
+
     def __str__(self):
         return f"Warning {self.position}: {self.element_type} exceeded soft limit ({self.limit})"
 
@@ -83,7 +77,7 @@ class Lexer:
     ):
         self.reader = reader
         self.current_char = self.reader.current()
-        self.error_handler = error_handler  
+        self.error_handler = error_handler
 
         self.max_identifier_length = max_identifier_length
         self.max_int_value = max_int_value
@@ -174,7 +168,9 @@ class Lexer:
 
             while self.current_char.isdecimal():
                 if total_chars >= self.hard_max_digits:
-                    raise HardLimitError("Number literal", self.hard_max_digits, start_pos)
+                    raise HardLimitError(
+                        "Number literal", self.hard_max_digits, start_pos
+                    )
 
                 digit = ord(self.current_char) - ord("0")
                 frac_value = frac_value * 10 + digit
@@ -277,7 +273,9 @@ class Lexer:
 
             if exceeded_soft_limit:
                 self._report_warning(
-                    SoftLimitWarning("String literal", self.max_string_length, start_pos)
+                    SoftLimitWarning(
+                        "String literal", self.max_string_length, start_pos
+                    )
                 )
 
             return Token(TokenType.STRING_LITERAL, "".join(result), start_pos)

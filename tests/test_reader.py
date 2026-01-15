@@ -1,7 +1,6 @@
 import unittest
 import io
-from src.reader import CharReader, EOF
-from src.position import Position
+from src.lexer.reader import CharReader, EOF
 
 
 class TestCharReader(unittest.TestCase):
@@ -47,7 +46,7 @@ class TestCharReader(unittest.TestCase):
                 "polish",
                 "ąź",
                 ["ą", "ź", EOF],
-            ),  
+            ),
         ]
 
         for name, text, expected_chars in cases:

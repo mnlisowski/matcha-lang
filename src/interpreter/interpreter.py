@@ -1,9 +1,16 @@
 from typing import Optional, Any
-from src.visitor import Visitor
-from src.ast_nodes import *
-from .environment import Environment, RuntimeError, NameError, TypeError, ValueError, ArgumentError, LimitError
+from src.ast.visitor import Visitor
+from src.ast.ast_nodes import *
+from .environment import (
+    Environment,
+    RuntimeError,
+    NameError,
+    TypeError,
+    ValueError,
+    ArgumentError,
+    LimitError,
+)
 
-        
 
 class RuntimeError(Exception):
     def __init__(self, message: str, location: Optional[SourceLocation]):
@@ -16,13 +23,16 @@ class RuntimeError(Exception):
         else:
             super().__init__(f"Runtime error: {message}")
 
+
 class TypeError(RuntimeError):
     """niezgodnosc typów"""
+
     pass
 
 
 class NameError(RuntimeError):
     """niezdefiniowane nazwy"""
+
     pass
 
 
@@ -32,17 +42,20 @@ class ValueError(RuntimeError):
 
 class ArgumentError(RuntimeError):
     """liczba/typ argumentów"""
+
     pass
+
 
 # Interpreter
 
-class Interpreter(Visitor):
 
+class Interpreter(Visitor):
     def __init__(self):
-        self.environment = Environment() #przydatne przy wywołaniach funkcji gdzie nie chcemy przesłaniać zmiennych
+        self.environment = (
+            Environment()
+        )  # przydatne przy wywołaniach funkcji gdzie nie chcemy przesłaniać zmiennych
         self._build_builtins()
         self.last_result = None
-    
 
     def _build_builtins(self):
         builtins = [
@@ -56,16 +69,16 @@ class Interpreter(Visitor):
             self.environment.define_function(func.name, func)
 
     def _builtin_print(self, *args):
-        print(*args, end='')
+        print(*args, end="")
         return None
-    
+
     def _builtin_println(self, *args):
         print(*args)
         return None
-    
+
     def _builtin_input(self):
         return input()
-    
+
     def _builtin_typeof(self, value):
         # TYPES = {
         #     bool: "bool",
@@ -73,7 +86,7 @@ class Interpreter(Visitor):
         #     str: "string",
         #     float: "float"
         # }
-        if isinstance(value, bool): #isinstance(True,int) zwraca true, wiec przed
+        if isinstance(value, bool):  # isinstance(True,int) zwraca true, wiec przed
             return "bool"
         elif isinstance(value, int):
             return "int"
@@ -84,44 +97,43 @@ class Interpreter(Visitor):
         else:
             return "unknown"
         # return TYPES.get
-        
+
     def consume(self) -> Any:
         result = self.last_result
         self.last_result = None
         return result
-    
-    def _check_same_types(self, left: Any, right: Any, operator: str, location: SourceLocation) -> None:
+
+    def _check_same_types(
+        self, left: Any, right: Any, operator: str, location: SourceLocation
+    ) -> None:
         if type(left) != type(right):
             raise TypeError(
                 f"Cannot perform '{operator}' on {type(left).__name__} and {type(right).__name__}. "
                 f"Types must match exactly",
-                location
+                location,
             )
-    
-    def _check_numeric(self, value: Any, operator: str, location: SourceLocation) -> None:
+
+    def _check_numeric(
+        self, value: Any, operator: str, location: SourceLocation
+    ) -> None:
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise TypeError(
                 f"Operator '{operator}' requires numeric type, got {type(value).__name__}",
-                location
+                location,
             )
-    
+
     def _check_bool(self, value: Any, context: str, location: SourceLocation) -> None:
         if not isinstance(value, bool):
             raise TypeError(
-                f"{context} must be bool, got {type(value).__name__}",
-                location
+                f"{context} must be bool, got {type(value).__name__}", location
             )
-    
+
     def interpret(self, node: ASTNode):
-
-
         try:
             node.accept(self)
             return self.last_result
         except LimitError as e:
             raise RuntimeError(str(e), None)
-
-    
 
     def visit_Program(self, node: Program):
         for func_def in node.functions:
@@ -130,24 +142,22 @@ class Interpreter(Visitor):
                 if isinstance(existing, BuiltinFunction):
                     raise RuntimeError(
                         f"Cannot redefine builtin function '{func_def.name}'",
-                        func_def.location
+                        func_def.location,
                     )
             self.environment.define_function(func_def.name, func_def)
-        
+
     def visit_BuiltinFunction(self, node):
         self.last_result = node.call(*self.environment.get_args())
 
     def visit_FunctionDefinition(self, node: FunctionDefinition):
-        
         args = self.environment.get_args()
 
         if node.body is not None:
-
             if len(args) != len(node.params):
                 raise ArgumentError(
-                f"Function '{node.name}' expects {len(node.params)} arguments, got {len(args)}",
-                node.location
-            )
+                    f"Function '{node.name}' expects {len(node.params)} arguments, got {len(args)}",
+                    node.location,
+                )
 
             for param_name, arg_value in zip(node.params, args):
                 self.environment.define(param_name, arg_value)
@@ -156,41 +166,36 @@ class Interpreter(Visitor):
 
             self.last_result = self.environment.get_return_value()
 
-
-           
     def visit_FunctionCall(self, node: FunctionCall):
-      
         if (func := self.environment.get_function(node.name)) is None:
             raise NameError(f"Function {node.name} not defined", node.location)
-        
+
         args = []
         for arg_expression in node.arguments:
             arg_expression.accept(self)
             args.append(self.consume())
-            
+
         self.environment.enter_function(args, node.name, node.location)
 
         func.accept(self)
-        
+
         self.environment.exit_function()
-    
 
     def visit_FunctionCallStatement(self, node: FunctionCallStatement):
         call_node = FunctionCall(node.name, node.arguments, node.location)
         call_node.accept(self)
-    
+
     def visit_ReturnStatement(self, node):
-        if self.environment.depth() == 0:  
+        if self.environment.depth() == 0:
             raise RuntimeError("'return' outside of function", node.location)
-    
+
         if node.expression:
             node.expression.accept(self)
             value = self.consume()
         else:
             value = None
-    
-        self.environment.on_return(value)
 
+        self.environment.on_return(value)
 
     def visit_IntLiteral(self, node):
         self.last_result = node.value
@@ -203,197 +208,188 @@ class Interpreter(Visitor):
 
     def visit_BoolLiteral(self, node):
         self.last_result = node.value
-    
+
     def visit_Variable(self, node: Variable):
         try:
             self.last_result = self.environment.get(node.name)
         except Exception:
             raise NameError(f"Undefined variable '{node.name}", node.location)
 
-    def visit_AssignmentStatement(self, node:AssignmentStatement):
-      
+    def visit_AssignmentStatement(self, node: AssignmentStatement):
         node.expression.accept(self)
         value = self.consume()
 
         self.environment.define_or_assign(node.variable_name, value)
-    
+
     def visit_AddExpression(self, node: AddExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "+", node.location)
-        
+
         if isinstance(left, str):
             self.last_result = left + right
             return
-        
+
         self._check_numeric(left, "+", node.location)
 
         self.last_result = left + right
-    
-    
+
     def visit_SubtractExpression(self, node: SubtractExpression):
-        
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "-", node.location)
         self._check_numeric(left, "-", node.location)
-        
+
         self.last_result = left - right
-    
+
     def visit_MultiplyExpression(self, node: MultiplyExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "*", node.location)
         self._check_numeric(left, "*", node.location)
-        
+
         self.last_result = left * right
-    
-    
+
     def visit_DivideExpression(self, node: DivideExpression):
-        
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "/", node.location)
         self._check_numeric(left, "/", node.location)
-        
+
         if right == 0:
             raise ValueError("Division by zero", node.location)
-        
+
         self.last_result = left / right
-    
+
     def visit_UnaryMinusExpression(self, node: UnaryMinusExpression):
         node.operand.accept(self)
         value = self.consume()
-        
+
         self._check_numeric(value, "unary -", node.location)
-        
+
         self.last_result = -value
-    
+
     def visit_EqualExpression(self, node: EqualExpression):
-        
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "==", node.location)
-        
+
         self.last_result = left == right
-    
+
     def visit_NotEqualExpression(self, node: NotEqualExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "!=", node.location)
-        
+
         self.last_result = left != right
-    
+
     def visit_LessExpression(self, node: LessExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "<", node.location)
         self._check_numeric(left, "<", node.location)
-        
+
         self.last_result = left < right
-    
+
     def visit_LessEqualExpression(self, node: LessEqualExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, "<=", node.location)
         self._check_numeric(left, "<=", node.location)
-        
+
         self.last_result = left <= right
-    
+
     def visit_GreaterExpression(self, node: GreaterExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, ">", node.location)
         self._check_numeric(left, ">", node.location)
-        
+
         self.last_result = left > right
-    
+
     def visit_GreaterEqualExpression(self, node: GreaterEqualExpression):
         node.left.accept(self)
         left = self.consume()
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_same_types(left, right, ">=", node.location)
         self._check_numeric(left, ">=", node.location)
-        
+
         self.last_result = left >= right
-    
+
     # operatory logiczne
 
     def visit_AndExpression(self, node: AndExpression):
-
         node.left.accept(self)
         left = self.consume()
-        
+
         self._check_bool(left, "Left operand of 'and'", node.location)
-        
+
         if not left:
             self.last_result = False
             return
-        
+
         node.right.accept(self)
         right = self.consume()
-        
-        self._check_bool(right, "Right operand of 'and'", node.location)
-        
-        self.last_result = right
-    
-    def visit_OrExpression(self, node: OrExpression):
 
+        self._check_bool(right, "Right operand of 'and'", node.location)
+
+        self.last_result = right
+
+    def visit_OrExpression(self, node: OrExpression):
         node.left.accept(self)
         left = self.consume()
-        
+
         self._check_bool(left, "Left operand of 'or'", node.location)
-        
+
         if left:
             self.last_result = True
             return
-        
+
         node.right.accept(self)
         right = self.consume()
-        
+
         self._check_bool(right, "Right operand of 'or'", node.location)
-        
+
         self.last_result = right
-        
+
     def visit_NotExpression(self, node: NotExpression):
         node.operand.accept(self)
         value = self.consume()
-        
+
         self._check_bool(value, "Operand of '!'", node.location)
-        
+
         self.last_result = not value
-    
+
     def visit_Block(self, node: Block):
-    
         self.environment.enter_block()
 
         for statement in node.statements:
@@ -401,45 +397,35 @@ class Interpreter(Visitor):
             if self.environment.should_interrupt():
                 break
         self.environment.exit_block()
-    
-    
+
     def visit_IfStatement(self, node: IfStatement):
-        
         node.condition.accept(self)
         condition = self.consume()
 
         self._check_bool(condition, "If condition", node.location)
-            
-        
+
         if condition:
             node.then_branch.accept(self)
         elif node.else_branch:
             node.else_branch.accept(self)
 
-    
     def visit_WhileStatement(self, node: WhileStatement):
-    
         node.condition.accept(self)
         self._check_bool(self.last_result, "While condition", node.location)
 
-    
         while self.last_result:
             self.environment.enter_loop()
             node.body.accept(self)
-        
+
             if self.environment.should_break() or self.environment.should_return():
                 self.environment.current_context().exit_loop()
                 break
 
             self.environment.exit_loop()
-    
+
             node.condition.accept(self)
             self._check_bool(self.last_result, "While condition", node.location)
-           
-       
-            
-          
-    
+
     def visit_BreakStatement(self, node):
         if not self.environment.is_in_loop():
             raise RuntimeError("'break' outside of loop", node.location)
@@ -451,18 +437,16 @@ class Interpreter(Visitor):
         self.environment.on_continue()
 
     def visit_MatchStatement(self, node: MatchStatement):
-        
-        
         subjects_with_aliases = []
         for expr, alias in node.subjects:
             expr.accept(self)
             value = self.consume()
             subjects_with_aliases.append((value, alias))
-        
-        self.environment.enter_match(subjects_with_aliases) 
-        
+
+        self.environment.enter_match(subjects_with_aliases)
+
         matched_any = False
-        
+
         for case in node.cases:
             case.accept(self)
 
@@ -472,11 +456,10 @@ class Interpreter(Visitor):
 
                 if self.environment.should_interrupt():
                     break
-            
+
         if not matched_any and node.default_case:
             node.default_case.body.accept(self)
-        
-    
+
         self.environment.exit_match()
 
         self.last_result = None
@@ -485,54 +468,51 @@ class Interpreter(Visitor):
         if node.is_default:
             self.last_result = True
             return
-        
+
         if node.condition is None:
             self.last_result = True
             return
-                        
+
         node.condition.accept(self)
         result = self.consume()
-        
+
         # Dla Expression musi być bool
         if not isinstance(node.condition, Pattern):
             self._check_bool(result, "Match case condition", node.location)
-        
+
         self.last_result = result
 
-  
     def visit_PositionalPattern(self, node: PositionalPattern):
-
         match_targets = self.environment.get_match_targets()
-        
+
         if len(node.patterns) != len(match_targets):
             raise RuntimeError(
                 f"Pattern count not matching. Expected {len(match_targets)}, "
                 f"got {len(node.patterns)}",
-                node.location
+                node.location,
             )
-        
+
         for i, pattern in enumerate(node.patterns):
-            
             self.environment.set_subject_index(i)
             pattern.accept(self)
-            
+
             if not self.consume():
                 self.last_result = False
                 return
-        
+
         self.last_result = True
 
     def visit_RelationalPattern(self, node: RelationalPattern):
         val = self.environment.get_current_target()
-        
+
         node.expression.accept(self)
         comp_val = self.consume()
-        
+
         # Różne typy = nie pasuje
         if type(val) != type(comp_val):
             self.last_result = False
             return
-        
+
         OPS = {
             ">": lambda a, b: a > b,
             "<": lambda a, b: a < b,
@@ -541,29 +521,28 @@ class Interpreter(Visitor):
             "==": lambda a, b: a == b,
             "!=": lambda a, b: a != b,
         }
-        
+
         op_func = OPS.get(node.op)
         self.last_result = op_func(val, comp_val) if op_func else False
 
     def visit_TypePattern(self, node: TypePattern):
         val = self.environment.get_current_target()
-        
+
         TYPES = {
             "int": lambda a: isinstance(a, int) and not isinstance(a, bool),
             "float": lambda a: isinstance(a, float),
             "string": lambda a: isinstance(a, str),
             "bool": lambda a: isinstance(a, bool),
-        }   
-        
+        }
+
         checker = TYPES.get(node.type_name)
         self.last_result = checker(val) if checker else False
-
 
     def visit_ConstantPattern(self, node: ConstantPattern):
         val = self.environment.get_current_target()
         node.value.accept(self)
         pattern_val = self.consume()
-        
+
         self.last_result = val == pattern_val
 
     def visit_WildcardPattern(self, node: WildcardPattern):
@@ -574,7 +553,7 @@ class Interpreter(Visitor):
         if not self.consume():
             self.last_result = False
             return
-        
+
         node.right.accept(self)
         self.last_result = self.consume()
 
@@ -584,15 +563,15 @@ class Interpreter(Visitor):
     def invoke(self, function_name, args=None):
         if args is None:
             args = []
-        
+
         func = self.environment.get_function(function_name)
         if func is None:
             raise RuntimeError(f"Function '{function_name}' not found", None)
-        
+
         self.environment.enter_function(args, function_name, None)
         try:
             func.accept(self)
         finally:
             self.environment.exit_function()
-        
+
         return self.consume()

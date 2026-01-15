@@ -1,7 +1,3 @@
-from .token_type import TokenType
-from .position import Position
-
-
 class Token:
     def __init__(self, type, value, position):
         self.type = type

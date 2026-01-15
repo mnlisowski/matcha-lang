@@ -1,4 +1,4 @@
-from .token_type import TokenType
+from src.lexer.token_type import TokenType
 
 KEYWORDS = {
     "fun": TokenType.FUN,
