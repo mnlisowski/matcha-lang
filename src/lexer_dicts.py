@@ -3,6 +3,7 @@ from .token_type import TokenType
 KEYWORDS = {
     "fun": TokenType.FUN,
     "break": TokenType.BREAK,
+    "continue": TokenType.CONTINUE,
     "return": TokenType.RETURN,
     "var": TokenType.VAR,
     "if": TokenType.IF,

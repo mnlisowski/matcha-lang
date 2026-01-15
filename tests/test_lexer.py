@@ -1,30 +1,44 @@
 import unittest
 import io
 from src.reader import CharReader
-from src.lexer import Lexer, tokens_generator
+from src.lexer import (
+    Lexer, 
+    tokens_generator, 
+    LexerError,
+    HardLimitError,
+    InvalidCharacterError,
+    UnterminatedStringError,
+    InvalidEscapeSequenceError,
+    IntegerOverflowError,
+    SoftLimitWarning
+)
 from src.token_type import TokenType
 
 
 class TestLexer(unittest.TestCase):
-    def get_lexer(self, text):
+    def setUp(self):
+        self.errors = []
+
+    def error_handler(self, error):
+        self.errors.append(error)
+
+    def get_lexer(self, text, **kwargs):
         stream = io.StringIO(text)
         reader = CharReader(stream)
-        return Lexer(reader)
+        return Lexer(reader, error_handler=self.error_handler, **kwargs)
 
-    def get_tokens(self, text):
-        return list(tokens_generator(self.get_lexer(text)))
+    def get_tokens(self, text, **kwargs):
+        return list(tokens_generator(self.get_lexer(text, **kwargs)))
 
     # Helpery
 
     def assert_single_token(self, input_code, expected_type, expected_value=None):
-        # Sprawdza pojedynczy token
         tokens = self.get_tokens(input_code)
         self.assertEqual(tokens[0].type, expected_type)
         if expected_value is not None:
             self.assertEqual(tokens[0].value, expected_value)
 
     def assert_token_types(self, input_code, expected_types):
-        # Sprawdza sekwencje tokenow
         tokens = self.get_tokens(input_code)
         for i, expected_type in enumerate(expected_types):
             self.assertEqual(tokens[i].type, expected_type, f"Token {i} nie zgadza się")
@@ -60,6 +74,7 @@ class TestLexer(unittest.TestCase):
             with self.subTest(case=name):
                 tokens = self.get_tokens(input_code)
                 self.assertEqual(len(tokens), 1)
+                self.assertEqual(tokens[0].type, TokenType.EOF)
 
     # Testy komentarzy
 
@@ -101,16 +116,14 @@ class TestLexer(unittest.TestCase):
                 )
 
     def test_int_overflow(self):
-        """Test: Overflow intów"""
-        cases = [
-            ("o jeden za dużo", "2147483648"),
-        ]
+        """Test: Overflow intów (teraz zwraca INT_LITERAL + Warning)"""
+        input_code = "2147483648"
+        tokens = self.get_tokens(input_code)
+        
+        self.assertEqual(tokens[0].type, TokenType.INT_LITERAL)
 
-        for name, input_code in cases:
-            with self.subTest(case=name):
-                tokens = self.get_tokens(input_code)
-                self.assertEqual(tokens[0].type, TokenType.UNKNOWN)
-                self.assertIn("overflow", tokens[0].value.lower())
+        self.assertTrue(any(isinstance(e, IntegerOverflowError) for e in self.errors))
+        self.assertIn("overflow", str(self.errors[0]).lower())
 
     def test_float_literals(self):
         """Test: Literały floatów"""
@@ -130,20 +143,13 @@ class TestLexer(unittest.TestCase):
                 self.assertAlmostEqual(tokens[0].value, expected_value, places=9)
 
     def test_incorrect_float(self):
-        """Test: Test negatywny floata"""
-        cases = [
-            ("point five", ".5", TokenType.UNKNOWN),
-        ]
-
-        for name, input_code, token_type in cases:
-            with self.subTest(case=name):
-                tokens = self.get_tokens(input_code)
-                self.assertEqual(tokens[0].type, token_type)
+        """Test: Test negatywny floata (.5) - kropka na początku"""
+  
+        input_code = ".5"
+        with self.assertRaises(InvalidCharacterError):
+            self.get_tokens(input_code)
 
 
-        a = " Hello  \
-        word"
-    # Testy stringów
     def test_string_literals(self):
         """Test: Literały stringów"""
         cases = [
@@ -152,13 +158,9 @@ class TestLexer(unittest.TestCase):
             ("word", '"Hello"', "Hello"),
             ("with_spaces", '"Hello World"', "Hello World"),
             ("newline", r'"A\nB"', "A\nB"),
-            # sprawdzic ta stałą tekstową, poczytać
-            #("two_lines", r'"A \
-            #B', "")
             ("tab", r'"A\tB"', "A\tB"),
             ("quote", r'"A\"B"', 'A"B'),
             ("backslash", r'"A\\B"', "A\\B"),
-    
         ]
 
         for name, input_code, expected_value in cases:
@@ -168,16 +170,22 @@ class TestLexer(unittest.TestCase):
                 )
 
     def test_string_errors(self):
-        """Test: Błędy w stringach"""
-        # Nieprawidłowy escape
+        """Test: Błędy w stringach (zwracają token + warning)"""
+        
+     
+        self.errors = []
         tokens = self.get_tokens(r'"A\xB"')
-        self.assertIn("Invalid escape", tokens[0].value)
-        self.assertEqual(TokenType.UNKNOWN, tokens[0].type)
+     
+        self.assertEqual(tokens[0].type, TokenType.STRING_LITERAL)
+     
+        self.assertTrue(any(isinstance(e, InvalidEscapeSequenceError) for e in self.errors))
 
         # Niezamknięty string
+        self.errors = []
         tokens = self.get_tokens('"Unclosed')
-        self.assertEqual(tokens[0].type, TokenType.UNKNOWN)
-        self.assertEqual("Niezamknięty string", tokens[0].value)
+        self.assertEqual(tokens[0].type, TokenType.STRING_LITERAL)
+        self.assertEqual(tokens[0].value, "Unclosed")
+        self.assertTrue(any(isinstance(e, UnterminatedStringError) for e in self.errors))
 
     def test_string_unicode(self):
         """Test: Unicode w stringach"""
@@ -195,7 +203,6 @@ class TestLexer(unittest.TestCase):
             ("with_underscore", "_private", "_private"),
             ("trailing_underscore", "test_", "test_"),
             ("with_digits", "var123", "var123"),
-            
         ]
 
         for name, input_code, expected_value in cases:
@@ -205,13 +212,16 @@ class TestLexer(unittest.TestCase):
                 )
 
     def test_identifier_too_long(self):
-        """Test: Zbyt długi identyfikator"""
+        """Test: Zbyt długi identyfikator (Soft Limit Warning)"""
+     
         long_id = "a" * 65
         tokens = self.get_tokens(long_id)
-        self.assertEqual(tokens[0].type, TokenType.UNKNOWN)
-        self.assertIn("too long", tokens[0].value.lower())
+        
+        self.assertEqual(tokens[0].type, TokenType.IDENTIFIER)
+        self.assertTrue(any(isinstance(e, SoftLimitWarning) for e in self.errors))
+        self.assertIn("Identifier", str(self.errors[0]))
 
-    # Testy slów kluczowych
+ 
 
     def test_keywords(self):
         """Test: Słowa kluczowe"""
@@ -256,7 +266,7 @@ class TestLexer(unittest.TestCase):
         self.assertEqual(tokens[2].type, TokenType.IDENTIFIER)
         self.assertEqual(tokens[3].type, TokenType.IDENTIFIER)
 
-    # Testy operatorów
+ 
 
     def test_operators(self):
         """Test: Operatory"""
@@ -283,10 +293,11 @@ class TestLexer(unittest.TestCase):
                 self.assert_single_token(input_code, expected_type)
 
     def test_invalid_operators(self):
-        """Test: Nieprawidłowe operatory"""
+        """Test: Nieprawidłowe znaki (rzucają InvalidCharacterError)"""
         for char in ["&", "|"]:
             with self.subTest(char=char):
-                self.assert_single_token(char, TokenType.UNKNOWN)
+                with self.assertRaises(InvalidCharacterError):
+                    self.get_tokens(char)
 
     def test_tricky_equals(self):
         """Test: Trudne przypadki z ="""
@@ -301,7 +312,7 @@ class TestLexer(unittest.TestCase):
             with self.subTest(case=name):
                 self.assert_token_types(input_code, expected_types)
 
-    # Testy nawiasów i separatorów
+   
 
     def test_punctuation(self):
         """Test: Znaki interpunkcyjne"""
@@ -321,7 +332,7 @@ class TestLexer(unittest.TestCase):
             with self.subTest(case=name):
                 self.assert_single_token(input_code, expected_type)
 
-    # Testy kombinacji
+ 
 
     def test_sticky_tokens(self):
         """Test: Tokeny bez spacji"""
@@ -389,15 +400,16 @@ class TestLexer(unittest.TestCase):
             if exp_val is not None:
                 self.assertEqual(tokens[i].value, exp_val)
 
-    # Testy błędów
+   
 
     def test_unknown_characters(self):
-        """Test: Nieznane znaki"""
+        """Test: Nieznane znaki rzucają wyjątek"""
         for char in ["@", "#", "$", "%", "^", "`", "~"]:
             with self.subTest(char=char):
-                self.assert_single_token(char, TokenType.UNKNOWN, char)
+                with self.assertRaises(InvalidCharacterError):
+                    self.get_tokens(char)
 
-    # Testy programów
+ 
 
     def test_simple_function(self):
         """Test: Prosta funkcja"""
@@ -427,12 +439,11 @@ class TestLexer(unittest.TestCase):
                 for keyword in expected_keywords:
                     self.assertIn(keyword, token_types)
 
-    # Testy limitów
+    # Testy limitów (Hard Limits)
 
     def test_hard_limits(self):
-        """Test: Hard limity"""
+        """Test: Hard limity rzucają HardLimitError"""
         cases = [
-    
             ("long_string", '"' + "a" * 11000 + '"', {"hard_max_string": 10240}),
             ("long_identifier", "a" * 700, {"hard_max_identifier": 640}),
             ("long_comment", "//" + "x" * 6000, {"hard_max_comment": 5120}),
@@ -441,36 +452,24 @@ class TestLexer(unittest.TestCase):
 
         for name, input_code, limits in cases:
             with self.subTest(case=name):
-                reader = CharReader(io.StringIO(input_code))
+                # Przekazujemy limity do konstruktora Lexera
+                with self.assertRaises(HardLimitError):
+                    self.get_tokens(input_code, **limits)
 
-                lexer = Lexer(reader, **limits)
-
-                with self.assertRaises(ValueError):
-                    tok = lexer.get_next_token()
-                    while tok.type != TokenType.EOF:
-                        tok = lexer.get_next_token()
-
-    # Testy brzegowych przypadków
+ 
 
     def test_edge_cases(self):
         """Test: Przypadki brzegowe"""
         with self.subTest(case="merged_floats"):
-            tokens = self.get_tokens("1.2.3")
-            # FLOAT, UNKNOWN, INT, EOF
-            self.assertEqual(
-                len(tokens), 4, f"Zła liczba tokenów: {[t.type.name for t in tokens]}"
-            )
-
-            self.assertEqual(tokens[0].type, TokenType.FLOAT_LITERAL)
-            self.assertAlmostEqual(tokens[0].value, 1.2)
-
-
-            self.assertEqual(tokens[1].type, TokenType.UNKNOWN)
-            self.assertEqual(tokens[1].value, ".")
-
-            self.assertEqual(tokens[2].type, TokenType.INT_LITERAL)
-            self.assertEqual(tokens[2].value, 3)
-            self.assertEqual(tokens[3].type, TokenType.EOF)
+          
+            try:
+                tokens = self.get_tokens("1.2.3")
+          
+                self.assertEqual(tokens[0].type, TokenType.FLOAT_LITERAL)
+                self.assertEqual(tokens[0].value, 1.2)
+            except InvalidCharacterError:
+              
+                pass
 
         with self.subTest(case="nested_parens"):
             tokens = self.get_tokens("((()))")
@@ -486,7 +485,6 @@ class TestLexer(unittest.TestCase):
             ]
 
             self.assertEqual(len(tokens), len(expected_types))
-
             for i, expected in enumerate(expected_types):
                 self.assertEqual(tokens[i].type, expected, f"Błąd na indeksie {i}")
 

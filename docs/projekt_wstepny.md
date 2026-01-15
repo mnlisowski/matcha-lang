@@ -418,7 +418,7 @@ WILDCARD          ::= "_"
 ### 5.2 Część Składniowa
 
 ```ebnf
-program             ::== {function_definition}
+program             ::== {function_definition} | {global_variable}
 
 statement           ::== match_statement
                      |   if_statement

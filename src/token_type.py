@@ -5,6 +5,7 @@ class TokenType(Enum):
     # Słowa Kluczowe
     FUN = auto()
     BREAK = auto()
+    CONTINUE = auto()
     RETURN = auto()
     VAR = auto()
     IF = auto()

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Any, Union, Tuple
 from abc import ABC, abstractmethod
 
+
 @dataclass
 class SourceLocation:
     line: int
@@ -23,19 +24,39 @@ class Expression(ASTNode):
 # WYRAŻENIA 
 
 @dataclass
-class Literal(Expression):
-    value: Any        
-    type_name: str 
+class IntLiteral(Expression):
+    value: int
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_Literal(self)
+        visitor.visit_IntLiteral(self)
+
+@dataclass
+class FloatLiteral(Expression):
+    value: float
+    location: SourceLocation
+    def accept(self, visitor):
+        visitor.visit_FloatLiteral(self)
+
+@dataclass
+class StringLiteral(Expression):
+    value: str
+    location: SourceLocation
+    def accept(self, visitor):
+        visitor.visit_StringLiteral(self)
+
+@dataclass
+class BoolLiteral(Expression):
+    value: bool
+    location: SourceLocation
+    def accept(self, visitor):
+        visitor.visit_BoolLiteral(self)
 
 @dataclass
 class Variable(Expression):
     name: str
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_Variable(self)
+        visitor.visit_Variable(self)
 
 @dataclass
 class FunctionCall(Expression):
@@ -43,7 +64,7 @@ class FunctionCall(Expression):
     arguments: List[Expression]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_FunctionCall(self)
+        visitor.visit_FunctionCall(self)
 
 @dataclass
 class AddExpression(Expression):
@@ -51,7 +72,7 @@ class AddExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_AddExpression(self)
+        visitor.visit_AddExpression(self)
 
 @dataclass
 class SubtractExpression(Expression):
@@ -59,7 +80,7 @@ class SubtractExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_SubtractExpression(self)
+        visitor.visit_SubtractExpression(self)
 
 @dataclass
 class MultiplyExpression(Expression):
@@ -67,7 +88,7 @@ class MultiplyExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_MultiplyExpression(self)
+        visitor.visit_MultiplyExpression(self)
 
 @dataclass
 class DivideExpression(Expression):
@@ -75,7 +96,7 @@ class DivideExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_DivideExpression(self)
+        visitor.visit_DivideExpression(self)
 
 @dataclass
 class OrExpression(Expression):
@@ -83,7 +104,7 @@ class OrExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_OrExpression(self)
+        visitor.visit_OrExpression(self)
 
 @dataclass
 class AndExpression(Expression):
@@ -91,7 +112,7 @@ class AndExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_AndExpression(self)
+        visitor.visit_AndExpression(self)
 
 @dataclass
 class EqualExpression(Expression):
@@ -99,7 +120,7 @@ class EqualExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_EqualExpression(self)
+        visitor.visit_EqualExpression(self)
 
 @dataclass
 class NotEqualExpression(Expression):
@@ -107,7 +128,7 @@ class NotEqualExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_NotEqualExpression(self)
+        visitor.visit_NotEqualExpression(self)
 
 @dataclass
 class LessExpression(Expression):
@@ -115,7 +136,7 @@ class LessExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_LessExpression(self)
+        visitor.visit_LessExpression(self)
 
 @dataclass
 class LessEqualExpression(Expression):
@@ -123,7 +144,7 @@ class LessEqualExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_LessEqualExpression(self)
+        visitor.visit_LessEqualExpression(self)
 
 @dataclass
 class GreaterExpression(Expression):
@@ -131,7 +152,7 @@ class GreaterExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_GreaterExpression(self)
+        visitor.visit_GreaterExpression(self)
 
 @dataclass
 class GreaterEqualExpression(Expression):
@@ -139,21 +160,21 @@ class GreaterEqualExpression(Expression):
     right: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_GreaterEqualExpression(self)
+        visitor.visit_GreaterEqualExpression(self)
 
 @dataclass
 class UnaryMinusExpression(Expression):
     operand: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_UnaryMinusExpression(self)
+        visitor.visit_UnaryMinusExpression(self)
 
 @dataclass
 class NotExpression(Expression):
     operand: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_NotExpression(self)
+        visitor.visit_NotExpression(self)
 
 # INSTRUKCJE 
 
@@ -162,7 +183,7 @@ class Block(Statement):
     statements: List[Statement]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_Block(self)
+        visitor.visit_Block(self)
 
 @dataclass
 class IfStatement(Statement):
@@ -171,7 +192,7 @@ class IfStatement(Statement):
     else_branch: Optional[Statement]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_IfStatement(self)
+        visitor.visit_IfStatement(self)
 
 @dataclass
 class WhileStatement(Statement):
@@ -179,20 +200,26 @@ class WhileStatement(Statement):
     body: Statement
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_WhileStatement(self)
+        visitor.visit_WhileStatement(self)
 
 @dataclass
 class ReturnStatement(Statement):
     expression: Optional[Expression]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_ReturnStatement(self)
+        visitor.visit_ReturnStatement(self)
 
 @dataclass 
 class BreakStatement(Statement):
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_BreakStatement(self)
+        visitor.visit_BreakStatement(self)
+    
+@dataclass
+class ContinueStatement(Statement):
+    location: SourceLocation
+    def accept(self, visitor):
+        visitor.visit_ContinueStatement(self)
 
 @dataclass
 class AssignmentStatement(Statement):
@@ -200,7 +227,7 @@ class AssignmentStatement(Statement):
     expression: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_AssignmentStatement(self)
+        visitor.visit_AssignmentStatement(self)
 
 @dataclass
 class FunctionCallStatement(Statement):
@@ -208,9 +235,9 @@ class FunctionCallStatement(Statement):
     arguments: List[Expression]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_FunctionCallStatement(self)
+        visitor.visit_FunctionCallStatement(self)
 
-# --- WZORCE (Patterns dla Match) ---
+
 
 class Pattern(ASTNode):
     pass
@@ -219,21 +246,21 @@ class Pattern(ASTNode):
 class WildcardPattern(Pattern):
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_WildcardPattern(self)
+        visitor.visit_WildcardPattern(self)
 
 @dataclass
 class ConstantPattern(Pattern):
     value: Expression  
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_ConstantPattern(self)
+        visitor.visit_ConstantPattern(self)
 
 @dataclass
 class TypePattern(Pattern):
     type_name: str
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_TypePattern(self)
+        visitor.visit_TypePattern(self)
 
 @dataclass
 class RelationalPattern(Pattern):
@@ -241,7 +268,7 @@ class RelationalPattern(Pattern):
     expression: Expression
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_RelationalPattern(self)
+        visitor.visit_RelationalPattern(self)
 
 @dataclass
 class AndPattern(Pattern):
@@ -249,14 +276,14 @@ class AndPattern(Pattern):
     right: Pattern
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_AndPattern(self)
+        visitor.visit_AndPattern(self)
 
 @dataclass
 class PositionalPattern(Pattern):
     patterns: List[Pattern]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_PositionalPattern(self)
+        visitor.visit_PositionalPattern(self)
 
 
 @dataclass
@@ -266,15 +293,16 @@ class MatchCase(ASTNode):
     location: SourceLocation
     is_default: bool = False
     def accept(self, visitor):
-        return visitor.visit_MatchCase(self)
+        visitor.visit_MatchCase(self)
 
 @dataclass
 class MatchStatement(Statement):
     subjects: List[Tuple[Expression, Optional[str]]]
     cases: List[MatchCase]
+    default_case: Optional[MatchCase]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_MatchStatement(self)
+        visitor.visit_MatchStatement(self)
 
 @dataclass
 class FunctionDefinition(Statement):
@@ -283,11 +311,19 @@ class FunctionDefinition(Statement):
     body: Block          
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_FunctionDefinition(self)
+        visitor.visit_FunctionDefinition(self)
 
 @dataclass
 class Program(ASTNode):
     functions: List[FunctionDefinition]
     location: SourceLocation
     def accept(self, visitor):
-        return visitor.visit_Program(self)
+        visitor.visit_Program(self)
+    
+@dataclass
+class BuiltinFunction(Statement):
+    name: str
+    call: Any  
+    
+    def accept(self, visitor):
+        visitor.visit_BuiltinFunction(self)

@@ -3,11 +3,74 @@ from .token import Token
 from .token_type import TokenType
 from .lexer_dicts import KEYWORDS, SINGLE_CHAR_TOKENS, DOUBLE_CHAR_TOKENS
 
+class LexerError(Exception):
+    
+    def __init__(self, message, position):
+        self.message = message
+        self.position = position
+        super().__init__(f"{message} at {position}")
+    
+    def __str__(self):
+        return f"Błąd leksykalny {self.position}: {self.message}"
+
+
+class HardLimitError(LexerError):
+    
+    def __init__(self, element_type, limit, position):
+        message = f"{element_type} exceeded hard limit ({limit})"
+        super().__init__(message, position)
+        self.element_type = element_type
+        self.limit = limit
+
+
+class InvalidCharacterError(LexerError):
+    
+    def __init__(self, char, position):
+        message = f"Unexpected character '{char}'"
+        super().__init__(message, position)
+        self.char = char
+
+
+class UnterminatedStringError(LexerError):
+    
+    def __init__(self, position):
+        message = "Unterminated string literal"
+        super().__init__(message, position)
+
+
+class InvalidEscapeSequenceError(LexerError):
+    
+    def __init__(self, escape_char, position):
+        message = f"Invalid escape sequence '\\{escape_char}'"
+        super().__init__(message, position)
+        self.escape_char = escape_char
+
+
+class IntegerOverflowError(LexerError):
+    
+    def __init__(self, value, max_value, position):
+        message = f"Integer overflow: {value} exceeds ({max_value})"
+        super().__init__(message, position)
+        self.value = value
+        self.max_value = max_value
+
+
+class SoftLimitWarning:
+    
+    def __init__(self, element_type, limit, position):
+        self.element_type = element_type
+        self.limit = limit
+        self.position = position
+    
+    def __str__(self):
+        return f"Warning {self.position}: {self.element_type} exceeded soft limit ({self.limit})"
+
 
 class Lexer:
     def __init__(
         self,
         reader,
+        error_handler=None,
         max_identifier_length=64,
         max_int_value=2147483647,
         max_string_length=1024,
@@ -20,6 +83,7 @@ class Lexer:
     ):
         self.reader = reader
         self.current_char = self.reader.current()
+        self.error_handler = error_handler  
 
         self.max_identifier_length = max_identifier_length
         self.max_int_value = max_int_value
@@ -41,7 +105,6 @@ class Lexer:
             self._try_read_string,
             self._try_read_compound_operator,
             self._try_read_single_char_token,
-  
         ]
 
     def advance(self):
@@ -50,6 +113,10 @@ class Lexer:
     def skip_whitespace(self):
         while self.current_char.isspace():
             self.advance()
+
+    def _report_warning(self, error):
+        if self.error_handler:
+            self.error_handler(error)
 
     def _try_read_comment(self):
         if self.current_char != "/" or self.reader.check_next() != "/":
@@ -63,29 +130,20 @@ class Lexer:
         exceeded_soft_limit = False
 
         while self.current_char != EOF and self.current_char != "\n":
-            # hard limit
+            # Hard limit
             if len(comment_text) >= self.hard_max_comment:
-                # zamiast vlaueerror, stworzenie wlasnej hierarchii errorow, budowanie bledu z przekazaniem
-                # pozycji, mam pozycje binarną z która cos moge zrobic
-                raise ValueError(
-                    f"Comment is at hard limit ({self.hard_max_comment}) at {start_pos}. "
-                )
+                raise HardLimitError("Comment", self.hard_max_comment, start_pos)
 
             comment_text.append(self.current_char)
             self.advance()
 
-            # soft
+            # Soft limit
             if len(comment_text) > self.max_comment_length:
                 exceeded_soft_limit = True
 
         if exceeded_soft_limit:
-            # dolozyc handler zglaszania miekkich bledow
-            # lekser dostaje handler do ktorego moge wyslac warning
-            # zglosic blad, ale zwrocic token komentarza
-            return Token(
-                TokenType.UNKNOWN,
-                f"Comment too long (max {self.max_comment_length})",
-                start_pos,
+            self._report_warning(
+                SoftLimitWarning("Comment", self.max_comment_length, start_pos)
             )
 
         return Token(TokenType.COMMENT, "".join(comment_text), start_pos)
@@ -103,38 +161,27 @@ class Lexer:
 
         while self.current_char.isdecimal():
             if total_chars >= self.hard_max_digits:
-                raise ValueError(
-                    f"Number literal too long (> {self.hard_max_digits}) at {start_pos}."
-                )
+                raise HardLimitError("Number literal", self.hard_max_digits, start_pos)
 
             digit = ord(self.current_char) - ord("0")
             int_value = int_value * 10 + digit
             total_chars += 1
             self.advance()
 
-
         if self.current_char == ".":
             total_chars += 1
             self.advance()
-        
-    
 
             while self.current_char.isdecimal():
                 if total_chars >= self.hard_max_digits:
-                    raise ValueError(
-                        f"Number too long (> {self.hard_max_digits}) at {start_pos}"
-                    )
-                # int(self.current_char) zamiast ord()
-                # isdecimal moze nie dzialac na innych alfabetach, poczytac
+                    raise HardLimitError("Number literal", self.hard_max_digits, start_pos)
 
                 digit = ord(self.current_char) - ord("0")
                 frac_value = frac_value * 10 + digit
                 frac_digits += 1
                 total_chars += 1
                 self.advance()
-        
 
-       
             if frac_digits > 0:
                 final_value = float(int_value) + (float(frac_value) / (10**frac_digits))
             else:
@@ -144,12 +191,8 @@ class Lexer:
 
         else:
             if int_value > self.max_int_value:
-                #podobnie, zamiast UNKNOWN, rzucic wyjatek i leciec dalej
-                # nie moge psrawdzic pozycji gdzie przekroczylem, ale w/e
-                return Token(
-                    TokenType.UNKNOWN,
-                    f"Integer overflow (max {self.max_int_value})",
-                    start_pos,
+                self._report_warning(
+                    IntegerOverflowError(int_value, self.max_int_value, start_pos)
                 )
 
             return Token(TokenType.INT_LITERAL, int_value, start_pos)
@@ -162,38 +205,30 @@ class Lexer:
         text = []
         exceeded_soft_limit = False
 
-        while  self.current_char.isalnum() or self.current_char == "_":
-        
-            # hard limit
-            if len(text) == self.hard_max_identifier:
-                # rzucac wyjatek
-                raise ValueError(
-                    f"Exceeded hard limit ({self.hard_max_identifier}) at {start_pos}. "
-                )
+        while self.current_char.isalnum() or self.current_char == "_":
+            # Hard limit
+            if len(text) >= self.hard_max_identifier:
+                raise HardLimitError("Identifier", self.hard_max_identifier, start_pos)
 
             text.append(self.current_char)
             self.advance()
 
-            # soft
+            # Soft limit
             if len(text) > self.max_identifier_length:
                 exceeded_soft_limit = True
 
         text_str = "".join(text)
 
         if exceeded_soft_limit:
-            # nie zwracamy token unknown, powiadamiamy i zwracamy rzeczywisty token
-            return Token(
-                TokenType.UNKNOWN,
-                f"Identifier too long (max {self.max_identifier_length})",
-                start_pos,
+            self._report_warning(
+                SoftLimitWarning("Identifier", self.max_identifier_length, start_pos)
             )
 
-        # Sprawdzamy, czy to słowo kluczowe
         if token_type := KEYWORDS.get(text_str):
             return Token(token_type, None, start_pos)
         else:
             return Token(TokenType.IDENTIFIER, text_str, start_pos)
-#zrefaktoryzowac, za długa
+
     def _try_read_string(self):
         if self.current_char != '"':
             return None
@@ -203,32 +238,29 @@ class Lexer:
 
         result = []
         exceeded_soft_limit = False
-        invalid_escape_sequence = False
-        invalid_char_pos = None
+        invalid_escape_char = None
+        invalid_escape_pos = None
 
         escape_map = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}
 
         while self.current_char != EOF and self.current_char != '"':
-            # hard limit
+            # Hard limit
             if len(result) >= self.hard_max_string:
-                raise ValueError(
-                    f"String exceeded hard limit ({self.hard_max_string}) at {start_pos}. "
-                )
+                raise HardLimitError("String literal", self.hard_max_string, start_pos)
 
-            # soft
+            # Soft limit
             if len(result) > self.max_string_length:
                 exceeded_soft_limit = True
 
-# zrobic funkcje co appendowac, do 230l, i appendowac tylko raz
             if self.current_char == "\\":
                 self.advance()
 
                 if self.current_char in escape_map:
                     result.append(escape_map[self.current_char])
                 else:
-                    invalid_escape_sequence = True
-                    if invalid_char_pos is None:
-                        invalid_char_pos = self.reader.position()
+                    if invalid_escape_char is None:
+                        invalid_escape_char = self.current_char
+                        invalid_escape_pos = self.reader.position()
                     result.append(self.current_char)
             else:
                 result.append(self.current_char)
@@ -238,28 +270,20 @@ class Lexer:
         if self.current_char == '"':
             self.advance()
 
-            if invalid_escape_sequence:
-                return Token(
-                    # powiadamiamy o soft błędzie, 
-                    TokenType.UNKNOWN,
-                    f"Invalid escape sequence at {invalid_char_pos}",
-                    start_pos,
+            if invalid_escape_char is not None:
+                self._report_warning(
+                    InvalidEscapeSequenceError(invalid_escape_char, invalid_escape_pos)
                 )
 
             if exceeded_soft_limit:
-                return Token(
-                    # powiadamiamy o soft limicie, zwracamy 
-                    # rzeczywisty token, i zastnawiamy sie 
-                    # gdzie została dokładnie przekroczona długosc
-                    TokenType.UNKNOWN,
-                    f"String too long (max {self.max_string_length})",
-                    start_pos,
+                self._report_warning(
+                    SoftLimitWarning("String literal", self.max_string_length, start_pos)
                 )
 
             return Token(TokenType.STRING_LITERAL, "".join(result), start_pos)
         else:
-            # zwracamy rzeczywisty token, powiadamiamy o bledzie i dokladnej pozycji
-            return Token(TokenType.UNKNOWN, "Niezamknięty string", start_pos)
+            self._report_warning(UnterminatedStringError(start_pos))
+            return Token(TokenType.STRING_LITERAL, "".join(result), start_pos)
 
     def _try_read_compound_operator(self):
         """Sprawdza czy to złożony operator i go czyta, lub zwraca None"""
@@ -272,40 +296,31 @@ class Lexer:
 
         options = DOUBLE_CHAR_TOKENS[first]
         token_type = options.get(self.current_char)
-        # gdy drugi znak sie nie zgadza, rzucamy wyjatek zamiast UNKNOWNA
 
         if token_type:
             self.advance()
             return Token(token_type, None, pos)
 
-        valid_operator = options[None]
+        valid_operator = options.get(None)
         if valid_operator is None:
-            return Token(TokenType.UNKNOWN, first, pos)
+            raise InvalidCharacterError(first, pos)
 
         return Token(valid_operator, None, pos)
 
     def _try_read_single_char_token(self):
         """Sprawdza czy to pojedynczy znak i go czyta, lub zwraca None"""
-
-       
-        if token_type:= SINGLE_CHAR_TOKENS.get(self.current_char):
+        if token_type := SINGLE_CHAR_TOKENS.get(self.current_char):
             pos = self.reader.position()
             self.advance()
             return Token(token_type, None, pos)
         return None
 
-
     def _try_read_EOF(self):
-         if self.current_char == EOF:
-            
+        if self.current_char == EOF:
             return Token(TokenType.EOF, None, self.reader.position())
 
     def get_next_token(self):
-
         self.skip_whitespace()
-
-       
-
 
         for try_read in self.token_strategies:
             token = try_read()
@@ -315,7 +330,7 @@ class Lexer:
         pos = self.reader.position()
         char = self.current_char
         self.advance()
-        return Token(TokenType.UNKNOWN, char, pos)
+        raise InvalidCharacterError(char, pos)
 
 
 def tokens_generator(lexer: Lexer):

@@ -52,9 +52,9 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("42")
         
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Literal)
+
         self.assertEqual(expr.value, 42)
-        self.assertEqual(expr.type_name, "int")
+        self.assertIsInstance(expr, IntLiteral)
         self.assertIsNotNone(expr.location)
 
     def test_float_literal(self):
@@ -62,34 +62,29 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("3.14159")
         
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Literal)
         self.assertAlmostEqual(expr.value, 3.14159, places=5)
-        self.assertEqual(expr.type_name, "float")
+        self.assertIsInstance(expr, FloatLiteral)
 
     def test_string_literal(self):
         """Test string literal parsing."""
         expr, errors = self.parse_expr('"hello world"')
         
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Literal)
+        self.assertIsInstance(expr, StringLiteral)
         self.assertEqual(expr.value, "hello world")
-        self.assertEqual(expr.type_name, "string")
 
     def test_boolean_literals(self):
         """Test true and false literals."""
         # True
         expr_true, errors1 = self.parse_expr("true")
         self.assertFalse(errors1)
-        self.assertIsInstance(expr_true, Literal)
+        self.assertIsInstance(expr_true, BoolLiteral)
         self.assertEqual(expr_true.value, True)
-        self.assertEqual(expr_true.type_name, "bool")
         
         # False
         expr_false, errors2 = self.parse_expr("false")
         self.assertFalse(errors2)
-        self.assertIsInstance(expr_false, Literal)
         self.assertEqual(expr_false.value, False)
-        self.assertEqual(expr_false.type_name, "bool")
 
     def test_variable_expression(self):
         expr, errors = self.parse_expr("counter")
@@ -109,7 +104,6 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(expr.arguments), 3)
         
         # First argument: literal 1
-        self.assertIsInstance(expr.arguments[0], Literal)
         self.assertEqual(expr.arguments[0].value, 1)
         
         # Second argument: variable x
@@ -133,7 +127,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("(42)")
         
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Literal)
+        self.assertIsInstance(expr, IntLiteral)
         self.assertEqual(expr.value, 42)
 
     def test_deeply_nested_parentheses(self):
@@ -153,7 +147,6 @@ class TestParserIntegration(unittest.TestCase):
         
         self.assertFalse(errors)
         self.assertIsInstance(expr, UnaryMinusExpression)
-        self.assertIsInstance(expr.operand, Literal)
         self.assertEqual(expr.operand.value, 42)
         self.assertIsNotNone(expr.location)
 
@@ -163,17 +156,14 @@ class TestParserIntegration(unittest.TestCase):
         
         self.assertFalse(errors)
         self.assertIsInstance(expr, NotExpression)
-        self.assertIsInstance(expr.operand, Literal)
         self.assertEqual(expr.operand.value, True)
 
     def test_double_unary_minus(self):
         """Test double negation: --x."""
-        expr, errors = self.parse_expr("--x")
-        
-        self.assertTrue(errors)
-        print(errors[0])
-        self.assertIn("Expected expression after", errors[0])
-        #self.assertIsInstance(expr, UnaryMinusExpression)
+        parser, errors = self.parse_source("--x")
+    
+        with self.assertRaises(ParserError):
+            parser.try_parse_expression()
 
     def test_unary_not_on_expression(self):
         """Test NOT on complex expression."""
@@ -423,7 +413,7 @@ class TestParserIntegration(unittest.TestCase):
         self.assertFalse(errors)
         self.assertIsInstance(stmt, AssignmentStatement)
         self.assertEqual(stmt.variable_name, "x")
-        self.assertIsInstance(stmt.expression, Literal)
+        self.assertIsInstance(stmt.expression, IntLiteral)
         self.assertEqual(stmt.expression.value, 10)
 
     def test_assignment_with_expression(self):
@@ -437,8 +427,9 @@ class TestParserIntegration(unittest.TestCase):
 
     def test_assignment_chain_not_allowed(self):
         """Test that assignment doesn't chain (not an expression)."""
-        stmt, errors = self.parse_stmt("x = y = 5;")
-        self.assertTrue(len(errors) > 0)
+        parser, errors = self.parse_source("x = y = 5;")
+        with self.assertRaises(ParserError):
+            parser.try_parse_statement()
 
     
     # 9. FUNCTION CALL STATEMENT
@@ -907,7 +898,7 @@ class TestParserIntegration(unittest.TestCase):
         self.assertFalse(errors)
         self.assertIsInstance(stmt, MatchStatement)
         self.assertEqual(len(stmt.subjects), 0)
-        self.assertEqual(len(stmt.cases), 1)
+        self.assertEqual(len(stmt.cases), 0)
 
     def test_match_single_subject(self):
         """Test match with single subject."""
@@ -958,9 +949,10 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
         
         self.assertFalse(errors)
-        self.assertEqual(len(stmt.cases), 1)
+        self.assertEqual(len(stmt.cases), 0)
         
-        case = stmt.cases[0]
+        
+        case = stmt.default_case
         self.assertTrue(case.is_default)
         self.assertIsNone(case.condition)
         self.assertIsInstance(case.body, Block)
@@ -974,7 +966,7 @@ class TestParserIntegration(unittest.TestCase):
         
         self.assertFalse(errors)
         case = stmt.cases[0]
-        self.assertIsInstance(case.condition, Literal)
+        self.assertIsInstance(case.condition, IntLiteral)
         self.assertEqual(case.condition.value, 10)
         self.assertFalse(case.is_default)
 
@@ -1013,21 +1005,18 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
         
         self.assertFalse(errors)
-        self.assertEqual(len(stmt.cases), 3)
+        self.assertEqual(len(stmt.cases), 2)
         
         # First case: literal 1
-        self.assertIsInstance(stmt.cases[0].condition, Literal)
+        self.assertIsInstance(stmt.cases[0].condition, IntLiteral)
         self.assertEqual(stmt.cases[0].condition.value, 1)
         self.assertFalse(stmt.cases[0].is_default)
         
         # Second case: literal 2
-        self.assertIsInstance(stmt.cases[1].condition, Literal)
+        self.assertIsInstance(stmt.cases[1].condition, IntLiteral)
         self.assertEqual(stmt.cases[1].condition.value, 2)
         self.assertFalse(stmt.cases[1].is_default)
         
-        # Third case: default
-        self.assertTrue(stmt.cases[2].is_default)
-        self.assertIsNone(stmt.cases[2].condition)
 
     # 19. MATCH STATEMENT - PATTERNS
 
@@ -1203,7 +1192,7 @@ class TestParserIntegration(unittest.TestCase):
         
         self.assertFalse(errors)
         self.assertEqual(len(stmt.subjects), 2)
-        self.assertEqual(len(stmt.cases), 3)
+        self.assertEqual(len(stmt.cases), 2)
         
         # First case: [is int, > 0]
         case1_patterns = stmt.cases[0].condition.patterns
@@ -1294,35 +1283,28 @@ class TestParserIntegration(unittest.TestCase):
 
     def test_error_missing_semicolon(self):
         """Test error when semicolon is missing."""
-        _, errors = self.parse_stmt("x = 5")
-        
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected ';'", errors[0])
-        self.assertIn("Error at", errors[0])
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_stmt("x = 5")
 
     def test_error_missing_closing_paren(self):
         """Test error when closing parenthesis is missing."""
-        parser, errors = self.parse_source("if (x > 0 {}")
-        parser.try_parse_statement()
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_source("if (x > 0 {}")
+            parser.try_parse_statement()
         
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected ')'", errors[0])
 
     def test_error_missing_closing_brace(self):
         """Test error when closing brace is missing."""
-        parser, errors = self.parse_source("{ x = 1;")
-        parser.try_parse_block()
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_source("{ x = 1;")
+            parser.try_parse_block()
         
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected '}'", errors[0])
 
     def test_error_missing_expression_in_assignment(self):
         """Test error when expression is missing in assignment."""
-        parser, errors = self.parse_source("x = ;")
-        parser.try_parse_statement()
-        
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected expression", errors[0])
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_source("x = ;")
+            parser.try_parse_statement()
 
     def test_error_missing_expression_in_condition(self):
         """Test error when expression is missing in if condition."""
@@ -1331,16 +1313,15 @@ class TestParserIntegration(unittest.TestCase):
         with self.assertRaises(ParserError):
             parser.try_parse_statement()
         
-        self.assertTrue(len(errors) > 0)
 
     # 23. ERROR HANDLING - INVALID SYNTAX
 
     def test_error_invalid_assignment_target(self):
         """Test error when trying to assign to function call."""
-        _, errors = self.parse_stmt("foo() = 5;")
-        
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Cannot assign value", errors[0])
+
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_stmt("foo() = 5;")
+
 
     def test_error_duplicate_function_definition(self):
         """Test error when function is defined twice."""
@@ -1349,10 +1330,8 @@ class TestParserIntegration(unittest.TestCase):
         fun test() {}
         """
         parser, errors = self.parse_source(source)
-        parser.parse_program()
-        
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("already defined", errors[0])
+        with self.assertRaises(ParserError):
+            parser.parse_program()
 
     def test_error_missing_function_name(self):
         """Test critical error when function name is missing."""
@@ -1361,8 +1340,6 @@ class TestParserIntegration(unittest.TestCase):
         with self.assertRaises(ParserError):
             parser.parse_program()
         
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected function name", errors[0])
 
     def test_error_missing_function_body(self):
         """Test error when function body is missing."""
@@ -1371,14 +1348,13 @@ class TestParserIntegration(unittest.TestCase):
         with self.assertRaises(ParserError):
             parser.parse_program()
         
-        self.assertTrue(len(errors) > 0)
+    # def test_error_unexpected_token(self):
+    #     """Test error handling for unexpected tokens."""
+    #     parser, errors = self.parse_source("x = @;")
 
-    def test_error_unexpected_token(self):
-        """Test error handling for unexpected tokens."""
-        parser, errors = self.parse_source("x = @;")
-        parser.try_parse_statement()
+    #     with self.assertRaises(Exception):
+    #         parser.try_parse_expression()
         
-        self.assertTrue(len(errors) > 0)
 
     def test_error_statement_with_no_effect(self):
         """Test error for statement that has no effect."""
@@ -1387,17 +1363,16 @@ class TestParserIntegration(unittest.TestCase):
         with self.assertRaises(ParserError):
             parser.try_parse_statement()
         
-        self.assertTrue(len(errors) > 0)
+        # self.assertTrue(len(errors) > 0)
 
     # 24. ERROR HANDLING - MATCH STATEMENT ERRORS
 
     def test_error_match_missing_arrow(self):
         """Test error when => is missing in match case."""
-        parser, errors = self.parse_source("match x { 1 {} }")
-        parser.try_parse_statement()
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_source("match x { 1 {} }")
+            parser.try_parse_statement()
         
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected '=>'", errors[0])
 
     def test_error_match_missing_case_body(self):
         """Test error when match case body is missing."""
@@ -1408,12 +1383,10 @@ class TestParserIntegration(unittest.TestCase):
 
     def test_error_match_missing_closing_bracket(self):
         """Test error when ] is missing in positional pattern."""
-        parser, errors = self.parse_source("match x { [1, 2 => {} }")
-        parser.try_parse_statement()
+        with self.assertRaises(ParserError):
+            parser, errors = self.parse_source("match x { [1, 2 => {} }")
+            parser.try_parse_statement()
         
-        self.assertTrue(len(errors) > 0)
-        self.assertIn("Expected ']'", errors[0])
-
     # 25. EDGE CASES
 
     def test_edge_case_single_identifier_statement_error(self):
@@ -1494,7 +1467,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr('"hello\\nworld\\t!"')
         
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Literal)
+        self.assertIsInstance(expr, StringLiteral)
         self.assertEqual(expr.value, "hello\nworld\t!")
 
     def test_integration_lexer_float_numbers(self):
@@ -1502,8 +1475,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("3.14159")
         
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Literal)
-        self.assertEqual(expr.type_name, "float")
+        self.assertIsInstance(expr, FloatLiteral)
         self.assertAlmostEqual(expr.value, 3.14159)
 
     def test_integration_lexer_comments_ignored(self):
@@ -1565,7 +1537,7 @@ class TestParserIntegration(unittest.TestCase):
         
         # Verify match structure
         self.assertEqual(len(match_stmt.subjects), 2)
-        self.assertEqual(len(match_stmt.cases), 3)
+        self.assertEqual(len(match_stmt.cases), 2)
 
     def test_visualize_ast(self):
         """

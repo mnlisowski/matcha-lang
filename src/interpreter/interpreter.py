@@ -1,14 +1,8 @@
 from typing import Optional, Any
 from src.visitor import Visitor
 from src.ast_nodes import *
-from .environment import Environment
+from .environment import Environment, RuntimeError, NameError, TypeError, ValueError, ArgumentError, LimitError
 
-class BreakException(Exception):
-    pass
-
-class ReturnException(Exception):
-    def __init__(self, value: Any):
-        self.value = value
         
 
 class RuntimeError(Exception):
@@ -45,18 +39,21 @@ class ArgumentError(RuntimeError):
 class Interpreter(Visitor):
 
     def __init__(self):
-        self.globals = Environment() #przydatne przy wywołaniach funkcji gdzie nie chcemy przesłaniać zmiennych
-        self.builtins = {}
-        self.build_builtins()
+        self.environment = Environment() #przydatne przy wywołaniach funkcji gdzie nie chcemy przesłaniać zmiennych
+        self._build_builtins()
+        self.last_result = None
+    
 
-        self.environment = self.globals
-        self.current_subject = None
+    def _build_builtins(self):
+        builtins = [
+            BuiltinFunction("print", self._builtin_print),
+            BuiltinFunction("println", self._builtin_println),
+            BuiltinFunction("input", self._builtin_input),
+            BuiltinFunction("typeof", self._builtin_typeof),
+        ]
 
-    def build_builtins(self):
-        self.builtins["print"] = self._builtin_print
-        self.builtins["println"] = self._builtin_println
-        self.builtins["input"] = self._builtin_input
-        self.builtins["typeof"] = self._builtin_typeof
+        for func in builtins:
+            self.environment.define_function(func.name, func)
 
     def _builtin_print(self, *args):
         print(*args, end='')
@@ -70,6 +67,12 @@ class Interpreter(Visitor):
         return input()
     
     def _builtin_typeof(self, value):
+        # TYPES = {
+        #     bool: "bool",
+        #     float: "float",
+        #     str: "string",
+        #     float: "float"
+        # }
         if isinstance(value, bool): #isinstance(True,int) zwraca true, wiec przed
             return "bool"
         elif isinstance(value, int):
@@ -80,550 +83,516 @@ class Interpreter(Visitor):
             return "string"
         else:
             return "unknown"
+        # return TYPES.get
+        
+    def consume(self) -> Any:
+        result = self.last_result
+        self.last_result = None
+        return result
+    
+    def _check_same_types(self, left: Any, right: Any, operator: str, location: SourceLocation) -> None:
+        if type(left) != type(right):
+            raise TypeError(
+                f"Cannot perform '{operator}' on {type(left).__name__} and {type(right).__name__}. "
+                f"Types must match exactly",
+                location
+            )
+    
+    def _check_numeric(self, value: Any, operator: str, location: SourceLocation) -> None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(
+                f"Operator '{operator}' requires numeric type, got {type(value).__name__}",
+                location
+            )
+    
+    def _check_bool(self, value: Any, context: str, location: SourceLocation) -> None:
+        if not isinstance(value, bool):
+            raise TypeError(
+                f"{context} must be bool, got {type(value).__name__}",
+                location
+            )
     
     def interpret(self, node: ASTNode):
 
+
         try:
-            return node.accept(self)
-        except (RuntimeError, BreakException, ReturnException) as e:
-            if isinstance(e, BreakException):
-                raise RuntimeError("Break should not escape the scope", None)
-            elif isinstance(e, ReturnException):
-                raise RuntimeError("Return should not escape the scope", None)
-            else:
-                raise 
+            node.accept(self)
+            return self.last_result
+        except LimitError as e:
+            raise RuntimeError(str(e), None)
+
+    
 
     def visit_Program(self, node: Program):
         for func_def in node.functions:
-            func_def.accept(self)
-        return None
-    
+            if self.environment.has_function(func_def.name):
+                existing = self.environment.get_function(func_def.name)
+                if isinstance(existing, BuiltinFunction):
+                    raise RuntimeError(
+                        f"Cannot redefine builtin function '{func_def.name}'",
+                        func_def.location
+                    )
+            self.environment.define_function(func_def.name, func_def)
+        
+    def visit_BuiltinFunction(self, node):
+        self.last_result = node.call(*self.environment.get_args())
+
     def visit_FunctionDefinition(self, node: FunctionDefinition):
-        self.globals.define(node.name, node)
+        
+        args = self.environment.get_args()
 
+        if node.body is not None:
+
+            if len(args) != len(node.params):
+                raise ArgumentError(
+                f"Function '{node.name}' expects {len(node.params)} arguments, got {len(args)}",
+                node.location
+            )
+
+            for param_name, arg_value in zip(node.params, args):
+                self.environment.define(param_name, arg_value)
+
+            node.body.accept(self)
+
+            self.last_result = self.environment.get_return_value()
+
+
+           
     def visit_FunctionCall(self, node: FunctionCall):
-        # sprawdzam builtiny
-        if node.name in self.builtins:
-            args = []
-            for arg in node.arguments:
-                args.append(arg.accept(self))
-            return self.builtins[node.name](*args)
-        #pobieram funkcje z globals
-        try:
-            function_def = self.globals.get(node.name)
-        except Exception: #konflikt nazw, runtimeerror nie bylo przesloniete w environment
-            raise NameError(f"Undefined function '{node.name}'", node.location)
+      
+        if (func := self.environment.get_function(node.name)) is None:
+            raise NameError(f"Function {node.name} not defined", node.location)
         
-        # sprawdzam czy nie jest zmienną
-        if not isinstance(function_def, FunctionDefinition):
-            raise TypeError(
-                f"'{node.name}' is not a function",
-                node.location
-            )
-        # l. argumentów
-        if len(node.arguments) != len(function_def.params):
-            raise ArgumentError(
-                f"Function '{node.name}' expects {len(function_def.params)} "
-                f"arguments, got {len(node.arguments)}",
-                node.location
-            )
-        # bierzemy wartosci argumentow z aktualnego scopu
         args = []
-        for arg in node.arguments:
-            args.append(arg.accept(self))
+        for arg_expression in node.arguments:
+            arg_expression.accept(self)
+            args.append(self.consume())
+            
+        self.environment.enter_function(args, node.name, node.location)
 
-        # nowy scope. parentem jest globals a nie self.parent, bo nie chcemy przeslaniac zmiennych przy wywolywaniu funkcji
-        func_env = Environment(parent=self.globals)
-
-        # zmienne lokalne na podstawie argumentow funkcji
-        for arg_name, arg_value in zip(function_def.params,args):
-            func_env.define(arg_name, arg_value)
-
-        # wykonuje funkcje w nowym environment
-        old_env = self.environment
-        self.environment = func_env
-
-        try:
-            function_def.body.accept(self)
-            # Jeśli nie było wyjatku return, zwróć None
-            return None
-        except ReturnException as e:
-            return e.value
-        finally:
-            # zawsze przywracam stare srodowisko
-            self.environment = old_env
+        func.accept(self)
         
-    def visit_FunctionCallStatement(self, node: FunctionCallStatement):
-        # nie obchodzi mnie co zwraca
-        call_node = FunctionCall(node.name, node.arguments, node.location)
-        self.visit_FunctionCall(call_node)
-        return None
+        self.environment.exit_function()
     
-    def visit_ReturnStatement(self, node: ReturnStatement):
-        value = None
+
+    def visit_FunctionCallStatement(self, node: FunctionCallStatement):
+        call_node = FunctionCall(node.name, node.arguments, node.location)
+        call_node.accept(self)
+    
+    def visit_ReturnStatement(self, node):
+        if self.environment.depth() == 0:  
+            raise RuntimeError("'return' outside of function", node.location)
+    
         if node.expression:
-            value = node.expression.accept(self)
-        raise ReturnException(value)
+            node.expression.accept(self)
+            value = self.consume()
+        else:
+            value = None
+    
+        self.environment.on_return(value)
 
 
-    def visit_Literal(self, node: Literal):
-        return node.value
+    def visit_IntLiteral(self, node):
+        self.last_result = node.value
+
+    def visit_FloatLiteral(self, node):
+        self.last_result = node.value
+
+    def visit_StringLiteral(self, node):
+        self.last_result = node.value
+
+    def visit_BoolLiteral(self, node):
+        self.last_result = node.value
     
     def visit_Variable(self, node: Variable):
         try:
-            return self.environment.get(node.name)
-        except Exception: #tak samo jak visitcall, w environment runtimeerror nie jest przesloniety
+            self.last_result = self.environment.get(node.name)
+        except Exception:
             raise NameError(f"Undefined variable '{node.name}", node.location)
 
     def visit_AssignmentStatement(self, node:AssignmentStatement):
-        value = node.expression.accept(self)
-        # wpierw aktualizujemy istniejaca, jak nie ma to nowa w scope
+      
+        node.expression.accept(self)
+        value = self.consume()
 
-        if not self.environment.assign(node.variable_name, value):
-            self.environment.define(node.variable_name, value)
-
-        return None
+        self.environment.define_or_assign(node.variable_name, value)
     
     def visit_AddExpression(self, node: AddExpression):
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot perform '+' on {type(left).__name__} and {type(right).__name__}. "
-                f"Types must match exactly",
-                node.location
-            )
+        self._check_same_types(left, right, "+", node.location)
         
-         # konkatenacja
         if isinstance(left, str):
-            return left + right
+            self.last_result = left + right
+            return
         
-        if isinstance(left, (int, float)):
-            return left + right
-        
-        # Wszystkie inne 
-        raise TypeError(
-            f"Operator '+' not supported for type {type(left).__name__}",
-            node.location
-        )
+        self._check_numeric(left, "+", node.location)
+
+        self.last_result = left + right
+    
     
     def visit_SubtractExpression(self, node: SubtractExpression):
         
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot perform '-' on {type(left).__name__} and {type(right).__name__}. "
-                f"Requires same types",
-                node.location
-            )
+        self._check_same_types(left, right, "-", node.location)
+        self._check_numeric(left, "-", node.location)
         
-        if isinstance(left, (int, float)):
-            return left - right
-        
-        raise TypeError(
-            f"Operator '-' not supported for type {type(left).__name__}",
-            node.location
-        )
+        self.last_result = left - right
     
     def visit_MultiplyExpression(self, node: MultiplyExpression):
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot perform '*' on {type(left).__name__} and {type(right).__name__}. "
-                f"Types must match exactly",
-                node.location
-            )
+        self._check_same_types(left, right, "*", node.location)
+        self._check_numeric(left, "*", node.location)
         
-        if isinstance(left, (int, float)):
-            return left * right
-        
-        raise TypeError(
-            f"Operator '*' requires numeric types, got {type(left).__name__}",
-            node.location
-        )
+        self.last_result = left * right
     
     
     def visit_DivideExpression(self, node: DivideExpression):
         
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot perform '/' on {type(left).__name__} and {type(right).__name__}. "
-                f"Types must match exactly",
-                node.location
-            )
+        self._check_same_types(left, right, "/", node.location)
+        self._check_numeric(left, "/", node.location)
         
-        if not isinstance(left, (int, float)):
-            raise TypeError(
-                f"Operator '/' requires numeric types, got {type(left).__name__}",
-                node.location
-            )
-        
-        # przez zero
         if right == 0:
-            raise ValueError(
-                "Division by zero",
-                node.location
-            )
+            raise ValueError("Division by zero", node.location)
         
-        return left / right
+        self.last_result = left / right
     
     def visit_UnaryMinusExpression(self, node: UnaryMinusExpression):
-        value = node.operand.accept(self)
+        node.operand.accept(self)
+        value = self.consume()
         
-        if not isinstance(value, (int, float)):
-            raise TypeError(
-                f"Unary '-' requires numeric type, got {type(value).__name__}",
-                node.location
-            )
+        self._check_numeric(value, "unary -", node.location)
         
-        return -value
+        self.last_result = -value
     
     def visit_EqualExpression(self, node: EqualExpression):
         
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot compare {type(left).__name__} and {type(right).__name__} with '=='. "
-                f"Need same types",
-                node.location
-            )
+        self._check_same_types(left, right, "==", node.location)
         
-        return left == right
+        self.last_result = left == right
     
     def visit_NotEqualExpression(self, node: NotEqualExpression):
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot compare {type(left).__name__} and {type(right).__name__} with '!='. "
-                f"Need same types",
-                node.location
-            )
+        self._check_same_types(left, right, "!=", node.location)
         
-        return left != right
+        self.last_result = left != right
     
     def visit_LessExpression(self, node: LessExpression):
-        """Operator '<' - mniejsze (tylko liczby)."""
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot compare {type(left).__name__} and {type(right).__name__} with '<'. "
-                f"Need same types",
-                node.location
-            )
+        self._check_same_types(left, right, "<", node.location)
+        self._check_numeric(left, "<", node.location)
         
-        if not isinstance(left, (int, float)):
-            raise TypeError(
-                f"Operator '<' requires numeric types, got {type(left).__name__}",
-                node.location
-            )
-        
-        return left < right
+        self.last_result = left < right
     
     def visit_LessEqualExpression(self, node: LessEqualExpression):
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot compare {type(left).__name__} and {type(right).__name__} with '<='. "
-                f"Need same types",
-                node.location
-            )
+        self._check_same_types(left, right, "<=", node.location)
+        self._check_numeric(left, "<=", node.location)
         
-        if not isinstance(left, (int, float)):
-            raise TypeError(
-                f"Operator '<=' requires numeric types, got {type(left).__name__}",
-                node.location
-            )
-        
-        return left <= right
+        self.last_result = left <= right
     
     def visit_GreaterExpression(self, node: GreaterExpression):
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot compare {type(left).__name__} and {type(right).__name__} with '>'. "
-                f"Need same types",
-                node.location
-            )
+        self._check_same_types(left, right, ">", node.location)
+        self._check_numeric(left, ">", node.location)
         
-        if not isinstance(left, (int, float)):
-            raise TypeError(
-                f"Operator '>' requires numeric types, got {type(left).__name__}",
-                node.location
-            )
-        
-        return left > right
+        self.last_result = left > right
     
     def visit_GreaterEqualExpression(self, node: GreaterEqualExpression):
-        left = node.left.accept(self)
-        right = node.right.accept(self)
+        node.left.accept(self)
+        left = self.consume()
+        node.right.accept(self)
+        right = self.consume()
         
-        if type(left) != type(right):
-            raise TypeError(
-                f"Cannot compare {type(left).__name__} and {type(right).__name__} with '>='. "
-                f"Need same types",
-                node.location
-            )
+        self._check_same_types(left, right, ">=", node.location)
+        self._check_numeric(left, ">=", node.location)
         
-        if not isinstance(left, (int, float)):
-            raise TypeError(
-                f"Operator '>=' requires numeric types, got {type(left).__name__}",
-                node.location
-            )
-        
-        return left >= right
+        self.last_result = left >= right
     
     # operatory logiczne
 
     def visit_AndExpression(self, node: AndExpression):
 
-        left= node.left.accept(self)
-
-        if not isinstance(left, bool):
-            raise TypeError(f"Operator 'AND' requires bool, got {type(left).__name__} on left side", node.location)
+        node.left.accept(self)
+        left = self.consume()
+        
+        self._check_bool(left, "Left operand of 'and'", node.location)
         
         if not left:
-            return False
+            self.last_result = False
+            return
         
-        right = node.right.accept(self)
-
-        if not isinstance(right, bool):
-            raise TypeError(
-                f"Operator 'AND' requires bool, got {type(right).__name__} on right side",
-                node.location
-            )
+        node.right.accept(self)
+        right = self.consume()
         
-        return right
+        self._check_bool(right, "Right operand of 'and'", node.location)
+        
+        self.last_result = right
     
     def visit_OrExpression(self, node: OrExpression):
 
-        left = node.left.accept(self)
-
-        if not isinstance(left, bool):
-             raise TypeError(
-             f"Operator 'OR' requires bool, got {type(left).__name__} on left side", node.location)
+        node.left.accept(self)
+        left = self.consume()
+        
+        self._check_bool(left, "Left operand of 'or'", node.location)
         
         if left:
-            return True
+            self.last_result = True
+            return
         
-        right = node.right.accept(self)
+        node.right.accept(self)
+        right = self.consume()
         
-        if not isinstance(right, bool):
-            raise TypeError(
-                f"Operator '||' requires bool, got {type(right).__name__} on right side",
-                node.location
-            )
+        self._check_bool(right, "Right operand of 'or'", node.location)
         
-        return right
+        self.last_result = right
         
     def visit_NotExpression(self, node: NotExpression):
-        value = node.operand.accept(self)
+        node.operand.accept(self)
+        value = self.consume()
         
-        if not isinstance(value, bool):
-            raise TypeError(
-                f"Operator '!' requires bool, got {type(value).__name__}",
-                node.location
-            )
+        self._check_bool(value, "Operand of '!'", node.location)
         
-        return not value
+        self.last_result = not value
     
     def visit_Block(self, node: Block):
-        old_env = self.environment
-        self.environment = Environment(parent=old_env)
+    
+        self.environment.enter_block()
 
-        # dajemy traja zeby przywrócić stary scope w wypadku wyjatku
-        try:
-            for statement in node.statements:
-                statement.accept(self)
-        finally:
-            self.environment = old_env
-
-        return None
+        for statement in node.statements:
+            statement.accept(self)
+            if self.environment.should_interrupt():
+                break
+        self.environment.exit_block()
+    
     
     def visit_IfStatement(self, node: IfStatement):
         
-        condition = node.condition.accept(self)
+        node.condition.accept(self)
+        condition = self.consume()
 
-        if not isinstance(condition, bool):
-            raise TypeError(
-                 f"If condition must be bool, got {type(condition).__name__}",
-                node.location
-            )
+        self._check_bool(condition, "If condition", node.location)
+            
         
         if condition:
             node.then_branch.accept(self)
         elif node.else_branch:
             node.else_branch.accept(self)
 
-        return None
     
     def visit_WhileStatement(self, node: WhileStatement):
+    
+        node.condition.accept(self)
+        self._check_bool(self.last_result, "While condition", node.location)
 
-        while True:
-            condition = node.condition.accept(self)
-
-            if not isinstance(condition, bool):
-                raise TypeError(
-                    f"While condition must be bool, got {type(condition).__name__}",
-                    node.location
-                )
-
-            if not condition:
-                break
-            try:
-                node.body.accept(self)
-            except BreakException:
+    
+        while self.last_result:
+            self.environment.enter_loop()
+            node.body.accept(self)
+        
+            if self.environment.should_break() or self.environment.should_return():
+                self.environment.current_context().exit_loop()
                 break
 
-        return None
+            self.environment.exit_loop()
     
-    def visit_BreakStatement(self, node: BreakStatement):
-        raise BreakException()
+            node.condition.accept(self)
+            self._check_bool(self.last_result, "While condition", node.location)
+           
+       
+            
+          
     
+    def visit_BreakStatement(self, node):
+        if not self.environment.is_in_loop():
+            raise RuntimeError("'break' outside of loop", node.location)
+        self.environment.on_break()
+
+    def visit_ContinueStatement(self, node):
+        if not self.environment.is_in_loop():
+            raise RuntimeError("'continue' outside of loop", node.location)
+        self.environment.on_continue()
+
     def visit_MatchStatement(self, node: MatchStatement):
-        previous_env = self.environment
         
-        # 1. Tworzymy scope dla aliasów
-        match_env = Environment(parent=previous_env)
         
-        values = []
+        subjects_with_aliases = []
         for expr, alias in node.subjects:
-            val = expr.accept(self)
-            values.append(val)
-            if alias:
-                match_env.define(alias, val)
+            expr.accept(self)
+            value = self.consume()
+            subjects_with_aliases.append((value, alias))
         
+        self.environment.enter_match(subjects_with_aliases) 
         
+        matched_any = False
         
-        # Zapisujemy scope (bo zagniezdzenia matchy)
-        match_env.define("$match_targets", values)
+        for case in node.cases:
+            case.accept(self)
 
-        self.environment = match_env
+            if self.consume():
+                matched_any = True
+                case.body.accept(self)
+
+                if self.environment.should_interrupt():
+                    break
+            
+        if not matched_any and node.default_case:
+            node.default_case.body.accept(self)
         
-        try:
-            matched_any = False
-            default_case = None
-            
-            # iteruje po kejsach bez default
-            for case in node.cases:
-                if case.is_default:
-                    default_case = case
-                    continue 
-                
-                # Sprawdzam dopasowanie
-                is_match = case.accept(self)
-                
-                if is_match:
-                    matched_any = True
-                    case.body.accept(self)
+    
+        self.environment.exit_match()
 
-            
-            if not matched_any and default_case:
-                default_case.body.accept(self)
-            
-        finally:
-            self.environment = previous_env
-
-        return None
+        self.last_result = None
 
     def visit_MatchCase(self, node: MatchCase):
         if node.is_default:
-            return True 
-                        
+            self.last_result = True
+            return
+        
         if node.condition is None:
-             return True
+            self.last_result = True
+            return
+                        
+        node.condition.accept(self)
+        result = self.consume()
         
-        if isinstance(node.condition, Pattern):
-            return node.condition.accept(self)
+        # Dla Expression musi być bool
+        if not isinstance(node.condition, Pattern):
+            self._check_bool(result, "Match case condition", node.location)
         
-        elif isinstance(node.condition, Expression):
-            result = node.condition.accept(self)
-            if not isinstance(result, bool):
-                 raise TypeError(f"Match condition must be bool, got {type(result).__name__}", node.location)
-            return result
-            
-        return False
+        self.last_result = result
 
   
     def visit_PositionalPattern(self, node: PositionalPattern):
 
-        match_values = self.environment.get("$match_targets")
+        match_targets = self.environment.get_match_targets()
         
-        if len(node.patterns) != len(match_values):
+        if len(node.patterns) != len(match_targets):
             raise RuntimeError(
-                f"Pattern count not matching. Expected {len(self.match_values)}, "
+                f"Pattern count not matching. Expected {len(match_targets)}, "
                 f"got {len(node.patterns)}",
                 node.location
             )
         
-        for pattern, value in zip(node.patterns, match_values):
+        for i, pattern in enumerate(node.patterns):
             
-            self.environment.define("$current_subject", value)
-            # Jeśli którykolwiek wzorzec nie pasuje, to calosc nie pasuje
-            if not pattern.accept(self):
-                return False
-                
-        return True
+            self.environment.set_subject_index(i)
+            pattern.accept(self)
+            
+            if not self.consume():
+                self.last_result = False
+                return
+        
+        self.last_result = True
 
     def visit_RelationalPattern(self, node: RelationalPattern):
-        val = self.environment.get("$current_subject")
+        val = self.environment.get_current_target()
         
-        comp_val = node.expression.accept(self) 
+        node.expression.accept(self)
+        comp_val = self.consume()
+        
+        # Różne typy = nie pasuje
         if type(val) != type(comp_val):
-           #albo false albo rzucamy wyjatek
-             return False 
-
-        if node.op == ">": return val > comp_val
-        if node.op == "<": return val < comp_val
-        if node.op == ">=": return val >= comp_val
-        if node.op == "<=": return val <= comp_val
-        if node.op == "==": return val == comp_val
-        if node.op == "!=": return val != comp_val
+            self.last_result = False
+            return
         
-        return False
+        OPS = {
+            ">": lambda a, b: a > b,
+            "<": lambda a, b: a < b,
+            ">=": lambda a, b: a >= b,
+            "<=": lambda a, b: a <= b,
+            "==": lambda a, b: a == b,
+            "!=": lambda a, b: a != b,
+        }
+        
+        op_func = OPS.get(node.op)
+        self.last_result = op_func(val, comp_val) if op_func else False
 
     def visit_TypePattern(self, node: TypePattern):
-        val = self.environment.get("$current_subject")
-        t = node.type_name
+        val = self.environment.get_current_target()
         
-    
-        t = str(t)
+        TYPES = {
+            "int": lambda a: isinstance(a, int) and not isinstance(a, bool),
+            "float": lambda a: isinstance(a, float),
+            "string": lambda a: isinstance(a, str),
+            "bool": lambda a: isinstance(a, bool),
+        }   
+        
+        checker = TYPES.get(node.type_name)
+        self.last_result = checker(val) if checker else False
 
-        if t == "int": 
-            return isinstance(val, int) and not isinstance(val, bool)
-        if t == "float": 
-            return isinstance(val, float)
-        if t == "string": 
-            return isinstance(val, str)
-        if t == "bool": 
-            return isinstance(val, bool)
-            
-        return False
 
     def visit_ConstantPattern(self, node: ConstantPattern):
-        val = self.environment.get("$current_subject")
-        pattern_val = node.value.accept(self)
-        return val == pattern_val
+        val = self.environment.get_current_target()
+        node.value.accept(self)
+        pattern_val = self.consume()
+        
+        self.last_result = val == pattern_val
 
     def visit_WildcardPattern(self, node: WildcardPattern):
-        return True
+        self.last_result = True
 
     def visit_AndPattern(self, node: AndPattern):
-        return node.left.accept(self) and node.right.accept(self)
+        node.left.accept(self)
+        if not self.consume():
+            self.last_result = False
+            return
+        
+        node.right.accept(self)
+        self.last_result = self.consume()
+
+    def load(self, node):
+        node.accept(self)
+
+    def invoke(self, function_name, args=None):
+        if args is None:
+            args = []
+        
+        func = self.environment.get_function(function_name)
+        if func is None:
+            raise RuntimeError(f"Function '{function_name}' not found", None)
+        
+        self.environment.enter_function(args, function_name, None)
+        try:
+            func.accept(self)
+        finally:
+            self.environment.exit_function()
+        
+        return self.consume()

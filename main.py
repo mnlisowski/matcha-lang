@@ -1,45 +1,73 @@
+#!/usr/bin/env python3
+
+
+import sys
 import io
 
 from src.reader import CharReader
-from src.lexer import Lexer, tokens_generator
-from src.token_type import TokenType
+from src.lexer import Lexer
+from src.parser import Parser, ParserError
+from src.interpreter.interpreter import Interpreter, RuntimeError
+# from src.ast_nodes import FunctionCall, SourceLocation
 
 
-def analyze_source(input_stream):
-    print(f"{'TYP TOKENU':<25} {'WARTOŚĆ':<25} {'POZYCJA'}")
-    print("-" * 70)
-
-    reader = CharReader(input_stream)
+def run(stream):
+    errors = []
+    
+    def error_handler(error):
+        errors.append(error)
+    
+    reader = CharReader(stream)
     lexer = Lexer(reader)
-    for token in tokens_generator(lexer):
-        val_str = str(token.value)
-        print(f"{token.type.name:<25} {val_str:<25} {token.position}")
-
-        if token.type == TokenType.UNKNOWN:
-            print(f"Nieznany token: '{token.value}'")
-
-            break
-
-# argumenty wywolania
-def main():
-    # Czytanie z tekstu
-    source_code_text = """
-    fun main() {
-        var text = "jakis tekst"";
-        print(text);
-    }
-    """
-    analyze_source(io.StringIO(source_code_text))
-
-    # Czytanie z pliku
-    filename = "test_file.txt"
-
+    parser = Parser(lexer, error_handler)
+    program = parser.parse_program()
+    
+    if errors:
+        for err in errors:
+            print(f"Błąd parsowania: {err}", file=sys.stderr)
+        return False
+    
+    interpreter = Interpreter()
+    
     try:
-        with open(filename, "r", encoding="utf-8") as f:
-            analyze_source(f)
+        interpreter.load(program) 
+        interpreter.invoke("main")
+        
+    except RuntimeError as e:
+        print(f"Błąd wykonania: {e}", file=sys.stderr)
+        return False
+    
+    return True
 
+
+def main():
+    if len(sys.argv) < 2:
+        print("Użycie:") 
+        sys.exit(1)
+    
+    try:
+        if sys.argv[1] == "-c":
+
+            if len(sys.argv) < 3:
+                print("brak kodu po -c")
+                sys.exit(1)
+            
+            source_stream = io.StringIO(sys.argv[2])
+            run(source_stream)
+        else:
+            filename = sys.argv[1]
+            with open(filename, "r", encoding="utf-8") as f:
+                run(f)
+            
     except FileNotFoundError:
-        print(f"File not found {filename}")
+        print(f"Błąd: Plik '{sys.argv[1]}' nie istnieje", file=sys.stderr)
+        sys.exit(1)
+    except ParserError as e:
+        print(f"Błąd składni: {e}", file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"Błąd wykonania: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

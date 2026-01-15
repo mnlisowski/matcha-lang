@@ -18,6 +18,8 @@ class Visitor(ABC):
     @abstractmethod
     def visit_BreakStatement(self, node): pass
     @abstractmethod
+    def visit_ContinueStatement(self, node): pass
+    @abstractmethod
     def visit_AssignmentStatement(self, node): pass
     @abstractmethod
     def visit_FunctionCallStatement(self, node): pass
@@ -27,7 +29,13 @@ class Visitor(ABC):
     def visit_MatchCase(self, node): pass
     
     @abstractmethod
-    def visit_Literal(self, node): pass
+    def visit_IntLiteral(self, node): pass
+    @abstractmethod
+    def visit_FloatLiteral(self, node): pass
+    @abstractmethod
+    def visit_StringLiteral(self, node): pass
+    @abstractmethod
+    def visit_BoolLiteral(self, node): pass
     @abstractmethod
     def visit_Variable(self, node): pass
     @abstractmethod
