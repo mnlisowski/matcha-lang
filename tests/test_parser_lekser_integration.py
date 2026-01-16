@@ -1318,7 +1318,6 @@ class TestParserIntegration(unittest.TestCase):
         with self.assertRaises(ParserError):
             parser.parse_program()
 
-
     def test_error_statement_with_no_effect(self):
         """Test error for statement that has no effect."""
         parser, errors = self.parse_source("x;")

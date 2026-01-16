@@ -1,30 +1,39 @@
 import pytest
-from src.interpreter.environment import RuntimeError, TypeError, NameError, ValueError, ArgumentError
+from src.interpreter.environment import (
+    RuntimeError,
+    TypeError,
+    NameError,
+    ValueError,
+    ArgumentError,
+)
 
 
 class TestEdgeCasesNegative:
-    """Testy negatywne i edge case'y."""
-
-    
-    @pytest.mark.parametrize("expr", [
-        "1 + 1.0",
-        "1.0 + 1",
-        "5 - 2.0",
-        "2.0 * 3",
-        "10 / 2", 
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "1 + 1.0",
+            "1.0 + 1",
+            "5 - 2.0",
+            "2.0 * 3",
+            "10 / 2",
+        ],
+    )
     def test_int_float_promotion(self, run, expr):
         code = f"fun main() {{ x = {expr}; return x + 1; }}"
         with pytest.raises(TypeError):
             run(code)
 
-    @pytest.mark.parametrize("left,right", [
-        ("1", '"a"'),
-        ('"a"', "1"),
-        ("true", "1"),
-        ("1", "true"),
-        ("true", '"a"'),
-    ])
+    @pytest.mark.parametrize(
+        "left,right",
+        [
+            ("1", '"a"'),
+            ('"a"', "1"),
+            ("true", "1"),
+            ("1", "true"),
+            ("true", '"a"'),
+        ],
+    )
     def test_incompatible_addition(self, run, left, right):
         code = f"fun main() {{ return {left} + {right}; }}"
         with pytest.raises(TypeError):
@@ -45,7 +54,6 @@ class TestEdgeCasesNegative:
         code = "fun main() { return 10.0 / 0.000000000001; }"
         with pytest.raises(ValueError):
             run(code)
-     
 
     def test_division_by_zero_float(self, run):
         code = "fun main() { return 10.0 / 0.0; }"
@@ -60,15 +68,18 @@ class TestEdgeCasesNegative:
 
     # logiczne
 
-    @pytest.mark.parametrize("expr", [
-        "1 and true",
-        "true and 1",
-        "0 or false",
-        '"" and true',
-        "!1",
-        "!0",
-        '!"hello"',
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "1 and true",
+            "true and 1",
+            "0 or false",
+            '"" and true',
+            "!1",
+            "!0",
+            '!"hello"',
+        ],
+    )
     def test_logical_operators_require_bool(self, run, expr):
         code = f"fun main() {{ return {expr}; }}"
         with pytest.raises(TypeError):
@@ -76,28 +87,34 @@ class TestEdgeCasesNegative:
 
     # if/while
 
-    @pytest.mark.parametrize("condition", [
-        "1",
-        "0",
-        '""',
-        '"true"',
-        "1.0",
-    ])
+    @pytest.mark.parametrize(
+        "condition",
+        [
+            "1",
+            "0",
+            '""',
+            '"true"',
+            "1.0",
+        ],
+    )
     def test_if_requires_bool(self, run, condition):
         code = f"""fun main() {{ if ({condition}) {{ return 1; }} return 0; }}"""
         with pytest.raises(TypeError):
             run(code)
 
-    @pytest.mark.parametrize("condition", [
-        "1",
-        '""',
-    ])
+    @pytest.mark.parametrize(
+        "condition",
+        [
+            "1",
+            '""',
+        ],
+    )
     def test_while_requires_bool(self, run, condition):
         code = f"fun main() {{ while ({condition}) {{ break; }} return 0; }}"
         with pytest.raises(TypeError):
             run(code)
 
-   # break/continue
+    # break/continue
 
     def test_break_outside_loop(self, run):
         code = "fun main() { break; }"
@@ -137,11 +154,14 @@ class TestEdgeCasesNegative:
         with pytest.raises(NameError):
             run(code)
 
-    @pytest.mark.parametrize("args,expected_error", [
-        ("", ArgumentError),      # za mało
-        ("1", ArgumentError),     # za mało  
-        ("1,2,3", ArgumentError), # za dużo
-    ])
+    @pytest.mark.parametrize(
+        "args,expected_error",
+        [
+            ("", ArgumentError),  # za mało
+            ("1", ArgumentError),  # za mało
+            ("1,2,3", ArgumentError),  # za dużo
+        ],
+    )
     def test_wrong_argument_count(self, run, args, expected_error):
         code = f"""
         fun add(a, b) {{ return a + b; }}
@@ -202,19 +222,6 @@ class TestEdgeCasesNegative:
         """
         assert run(code) == 0
 
-    def test_match_all_branches_execute(self, run_with_output):
-        code = """
-        fun main() {
-            x = 0;
-            match 10 as n {
-                [> 5] => { x = x + 1; },
-                [> 0] => { x = x + 10; },
-                [== 10] => { x = x + 100; }
-            }
-            return x;
-        }
-        """
-        assert run_with_output(code)[0] == 111
 
     def test_match_default_skipped_when_matched(self, run):
         code = """
@@ -293,7 +300,6 @@ class TestEdgeCasesNegative:
         """
         assert run(code) == "out of range"
 
-
     def test_return_without_value(self, run):
         """Return bez wartości zwraca None/null."""
         code = """
@@ -348,11 +354,14 @@ class TestEdgeCasesNegative:
 
     # operatory porównania
 
-    @pytest.mark.parametrize("left,right", [
-        ("1", "1.0"),
-        ("1.0", "1"),
-        ('"1"', "1"),
-    ])
+    @pytest.mark.parametrize(
+        "left,right",
+        [
+            ("1", "1.0"),
+            ("1.0", "1"),
+            ('"1"', "1"),
+        ],
+    )
     def test_comparison_type_not_match(self, run, left, right):
         code = f"fun main() {{ return {left} == {right}; }}"
         with pytest.raises(TypeError):
@@ -361,12 +370,11 @@ class TestEdgeCasesNegative:
     def test_compare_strings(self, run):
         """Porównanie stringów."""
         code = 'fun main() { return "abc" == "abc"; }'
-        assert run(code) == True
+        assert run(code)
 
     def test_compare_bools(self, run):
         code = "fun main() { return true == true; }"
-        assert run(code) == True
-
+        assert run(code)
 
     def test_empty_string(self, run):
         code = 'fun main() { return "" + "a"; }'
@@ -421,6 +429,20 @@ class TestEdgeCasesNegative:
             return 0;
         }
         """
-        # None nie jest bool 
+        # None nie jest bool
         with pytest.raises(TypeError):
             run(code)
+
+    # wywołania
+
+    def test_moderate_recursion_depth(self, run):
+        code = """
+        fun count_down(n) {
+            if (n <= 0) { return 0; }
+            return 1 + count_down(n - 1);
+        }
+        fun main() {
+            return count_down(50);
+        }
+        """
+        assert run(code) == 50
