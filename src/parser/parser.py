@@ -153,7 +153,7 @@ class Parser:
         while stmt := self.try_parse_statement():
             stmts.append(stmt)
 
-        self.consume(TokenType.RBRACE, "Expected '}' after nodes.block")
+        self.consume(TokenType.RBRACE, "Expected '}' after block")
         return nodes.Block(stmts, loc)
 
     def try_parse_if_statement(self) -> Optional[nodes.IfStatement]:
@@ -167,7 +167,7 @@ class Parser:
 
         if (condition := self.try_parse_expression()) is None:
             raise MissingExpressionError(
-                "Expected condition in if nodes.statement", self._loc()
+                "Expected condition in if statement", self._loc()
             )
 
         self.consume(TokenType.RPAREN, "Expected ')' after condition")
@@ -176,7 +176,7 @@ class Parser:
 
         if then_branch is None:
             raise MissingStatementError(
-                "Expected nodes.block after 'if' condition", self._loc()
+                "Expected block after 'if' condition", self._loc()
             )
 
         else_branch = None
@@ -201,7 +201,7 @@ class Parser:
 
         if (condition := self.try_parse_expression()) is None:
             raise MissingExpressionError(
-                "Expected condition in while nodes.statement", self._loc()
+                "Expected condition in while statement", self._loc()
             )
         self.consume(TokenType.RPAREN, "need ')' after condition")
 
