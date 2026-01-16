@@ -1,13 +1,13 @@
-from typing import Optional
+from typing import Optional, List, Union, Tuple
 
 from src.lexer.token_type import TokenType
 from src.lexer.lexer import Lexer
 
-from src.ast.ast_nodes import *
+import src.ast.ast_nodes as nodes
 
 
 class ParserError(Exception):
-    def __init__(self, message: str, location: SourceLocation):
+    def __init__(self, message: str, location: nodes.SourceLocation) -> None:
         self.message = message
         self.location = location
         super().__init__(
@@ -40,7 +40,7 @@ class MissingStatementError(ParserError):
 
 
 class Parser:
-    def __init__(self, lexer: Lexer, error_handler):
+    def __init__(self, lexer: Lexer, error_handler) -> None:
         self.lexer = lexer
         self.error_handler = error_handler
         self.current_token = None
@@ -70,15 +70,16 @@ class Parser:
 
             if strategy == "ABORT":
                 raise error
+            return False
 
     def match(self, *types: TokenType) -> bool:
         return self.current_token.type in types
 
-    def _loc(self) -> SourceLocation:
+    def _loc(self) -> nodes.SourceLocation:
         pos = self.current_token.position
-        return SourceLocation(pos.line, pos.column)
+        return nodes.SourceLocation(pos.line, pos.column)
 
-    def parse_program(self) -> Program:
+    def parse_program(self) -> nodes.Program:
         functions = {}
         start_loc = self._loc()
 
@@ -91,14 +92,14 @@ class Parser:
             functions[func_def.name] = func_def
 
         if self.match(TokenType.EOF):
-            return Program(list(functions.values()), start_loc)
+            return nodes.Program(list(functions.values()), start_loc)
 
         raise UnexpectedTokenError(
             f"Unexpected token after function definitions: {self.current_token.type}",
             self._loc(),
         )
 
-    def try_parse_break(self) -> Optional[Statement]:
+    def try_parse_break(self) -> Optional[nodes.Statement]:
         if not self.match(TokenType.BREAK):
             return None
         loc = self._loc()
@@ -108,9 +109,9 @@ class Parser:
             TokenType.SEMICOLON, "expected semicolon after Break", strategy="CONTINUE"
         )
 
-        return BreakStatement(loc)
+        return nodes.BreakStatement(loc)
 
-    def try_parse_continue(self) -> Optional[Statement]:
+    def try_parse_continue(self) -> Optional[nodes.Statement]:
         if not self.match(TokenType.CONTINUE):
             return None
         loc = self._loc()
@@ -122,9 +123,9 @@ class Parser:
             strategy="CONTINUE",
         )
 
-        return ContinueStatement(loc)
+        return nodes.ContinueStatement(loc)
 
-    def try_parse_statement(self) -> Optional[Statement]:
+    def try_parse_statement(self) -> Optional[nodes.Statement]:
         parsers = [
             self.try_parse_if_statement,
             self.try_parse_while_statement,
@@ -141,7 +142,7 @@ class Parser:
                 return stmt
         return None
 
-    def try_parse_block(self) -> Optional[Statement]:
+    def try_parse_block(self) -> Optional[nodes.Block]:
         if not self.match(TokenType.LBRACE):
             return None
 
@@ -152,10 +153,10 @@ class Parser:
         while stmt := self.try_parse_statement():
             stmts.append(stmt)
 
-        self.consume(TokenType.RBRACE, "Expected '}' after block")
-        return Block(stmts, loc)
+        self.consume(TokenType.RBRACE, "Expected '}' after nodes.block")
+        return nodes.Block(stmts, loc)
 
-    def try_parse_if_statement(self) -> Optional[Statement]:
+    def try_parse_if_statement(self) -> Optional[nodes.IfStatement]:
         if not self.match(TokenType.IF):
             return None
 
@@ -166,7 +167,7 @@ class Parser:
 
         if (condition := self.try_parse_expression()) is None:
             raise MissingExpressionError(
-                "Expected condition in if statement", self._loc()
+                "Expected condition in if nodes.statement", self._loc()
             )
 
         self.consume(TokenType.RPAREN, "Expected ')' after condition")
@@ -175,7 +176,7 @@ class Parser:
 
         if then_branch is None:
             raise MissingStatementError(
-                "Expected block after 'if' condition", self._loc()
+                "Expected nodes.block after 'if' condition", self._loc()
             )
 
         else_branch = None
@@ -183,11 +184,13 @@ class Parser:
             self.advance()
             else_branch = self.try_parse_block()
             if else_branch is None:
-                raise MissingStatementError("Expected block after 'else'", self._loc())
+                raise MissingStatementError(
+                    "Expected nodes.block after 'else'", self._loc()
+                )
 
-        return IfStatement(condition, then_branch, else_branch, loc)
+        return nodes.IfStatement(condition, then_branch, else_branch, loc)
 
-    def try_parse_while_statement(self) -> Optional[Statement]:
+    def try_parse_while_statement(self) -> Optional[nodes.WhileStatement]:
         if not self.match(TokenType.WHILE):
             return None
 
@@ -198,7 +201,7 @@ class Parser:
 
         if (condition := self.try_parse_expression()) is None:
             raise MissingExpressionError(
-                "Expected condition in while statement", self._loc()
+                "Expected condition in while nodes.statement", self._loc()
             )
         self.consume(TokenType.RPAREN, "need ')' after condition")
 
@@ -206,12 +209,12 @@ class Parser:
 
         if body is None:
             raise MissingStatementError(
-                "Expected block after 'while' condition", self._loc()
+                "Expected nodes.block after 'while' condition", self._loc()
             )
 
-        return WhileStatement(condition, body, loc)
+        return nodes.WhileStatement(condition, body, loc)
 
-    def try_parse_return_statement(self) -> Optional[Statement]:
+    def try_parse_return_statement(self) -> Optional[nodes.ReturnStatement]:
         if not self.match(TokenType.RETURN):
             return None
 
@@ -225,9 +228,9 @@ class Parser:
         self.consume(
             TokenType.SEMICOLON, "Expected ';' after return", strategy="CONTINUE"
         )
-        return ReturnStatement(expr, loc)
+        return nodes.ReturnStatement(expr, loc)
 
-    def try_parse_function_definition(self) -> Optional[FunctionDefinition]:
+    def try_parse_function_definition(self) -> Optional[nodes.FunctionDefinition]:
         if not self.match(TokenType.FUN):
             return None
 
@@ -249,19 +252,20 @@ class Parser:
                 f"Expected body for function '{name}'", self._loc()
             )
 
-        return FunctionDefinition(name, params, body, loc)
+        return nodes.FunctionDefinition(name, params, body, loc)
 
-    def _parse_parameter(self) -> str:
+    def _parse_parameter(self) -> Optional[str]:
         if self.match(TokenType.IDENTIFIER):
             parameter = self.current_token.value
             self.advance()
             return parameter
 
-    def _parse_parameter_list(self) -> list[str]:
+    def _parse_parameter_list(self) -> List[str]:
         params = []
         seen = set()
         if parameter := self._parse_parameter():
             params.append(parameter)
+            seen.add(parameter)
         else:
             return params
 
@@ -270,7 +274,7 @@ class Parser:
             if parameter := self._parse_parameter():
                 if parameter in seen:
                     raise DuplicateDefinitionError(
-                        "Duplicate parameter name '{param}'", self._loc()
+                        f"Duplicate parameter name '{parameter}'", self._loc()
                     )
                 params.append(parameter)
                 seen.add(parameter)
@@ -280,7 +284,7 @@ class Parser:
                 )
         return params
 
-    def try_parse_logic_or(self) -> Optional[Expression]:
+    def try_parse_logic_or(self) -> Optional[nodes.Expression]:
         left = self.try_parse_logic_and()
         if left is None:
             return None
@@ -290,12 +294,14 @@ class Parser:
             self.advance()
             right = self.try_parse_logic_and()
             if right is None:
-                raise MissingExpressionError("Expected expression after 'or'", loc)
+                raise MissingExpressionError(
+                    "Expected nodes.expression after 'or'", loc
+                )
 
-            left = OrExpression(left, right, loc)
+            left = nodes.OrExpression(left, right, loc)
         return left
 
-    def try_parse_logic_and(self) -> Optional[Expression]:
+    def try_parse_logic_and(self) -> Optional[nodes.Expression]:
         left = self.try_parse_equality()
         if left is None:
             return None
@@ -305,15 +311,17 @@ class Parser:
             self.advance()
             right = self.try_parse_equality()
             if right is None:
-                raise MissingExpressionError("Expected expression after 'and'", loc)
+                raise MissingExpressionError(
+                    "Expected nodes.expression after 'and'", loc
+                )
 
-            left = AndExpression(left, right, loc)
+            left = nodes.AndExpression(left, right, loc)
         return left
 
-    def try_parse_equality(self) -> Optional[Expression]:
+    def try_parse_equality(self) -> Optional[nodes.Expression]:
         EQUALITY_OPS = {
-            TokenType.EQUAL: EqualExpression,
-            TokenType.NOT_EQUAL: NotEqualExpression,
+            TokenType.EQUAL: nodes.EqualExpression,
+            TokenType.NOT_EQUAL: nodes.NotEqualExpression,
         }
 
         left = self.try_parse_comparison()
@@ -328,7 +336,7 @@ class Parser:
             right = self.try_parse_comparison()
             if right is None:
                 raise MissingExpressionError(
-                    "Expected expression after equality operator", loc
+                    "Expected nodes.expression after equality operator", loc
                 )
 
             constructor = EQUALITY_OPS[op_type]
@@ -336,12 +344,12 @@ class Parser:
 
         return left
 
-    def try_parse_comparison(self) -> Optional[Expression]:
+    def try_parse_comparison(self) -> Optional[nodes.Expression]:
         COMPARISON_OPS = {
-            TokenType.LESS: LessExpression,
-            TokenType.LESS_EQ: LessEqualExpression,
-            TokenType.GREATER: GreaterExpression,
-            TokenType.GREATER_EQ: GreaterEqualExpression,
+            TokenType.LESS: nodes.LessExpression,
+            TokenType.LESS_EQ: nodes.LessEqualExpression,
+            TokenType.GREATER: nodes.GreaterExpression,
+            TokenType.GREATER_EQ: nodes.GreaterEqualExpression,
         }
 
         left = self.try_parse_term()
@@ -356,17 +364,17 @@ class Parser:
             right = self.try_parse_term()
             if right is None:
                 raise MissingExpressionError(
-                    "Expected expression after comparison operator", loc
+                    "Expected nodes.expression after comparison operator", loc
                 )
 
             constructor = COMPARISON_OPS[op_type]
             left = constructor(left, right, loc)
         return left
 
-    def try_parse_term(self) -> Optional[Expression]:
+    def try_parse_term(self) -> Optional[nodes.Expression]:
         TERM_OPS = {
-            TokenType.PLUS: AddExpression,
-            TokenType.MINUS: SubtractExpression,
+            TokenType.PLUS: nodes.AddExpression,
+            TokenType.MINUS: nodes.SubtractExpression,
         }
 
         left = self.try_parse_factor()
@@ -380,17 +388,17 @@ class Parser:
             right = self.try_parse_factor()
             if right is None:
                 raise MissingExpressionError(
-                    "Expected expression after '+' or '-'", loc
+                    "Expected nodes.expression after '+' or '-'", loc
                 )
 
             constructor = TERM_OPS[op_type]
             left = constructor(left, right, loc)
         return left
 
-    def try_parse_factor(self) -> Optional[Expression]:
+    def try_parse_factor(self) -> Optional[nodes.Expression]:
         FACTOR_OPS = {
-            TokenType.MULTIPLY: MultiplyExpression,
-            TokenType.DIVIDE: DivideExpression,
+            TokenType.MULTIPLY: nodes.MultiplyExpression,
+            TokenType.DIVIDE: nodes.DivideExpression,
         }
 
         left = self.try_parse_unary()
@@ -405,23 +413,23 @@ class Parser:
             right = self.try_parse_unary()
             if right is None:
                 raise MissingExpressionError(
-                    "Expected expression after '*' or '/'", loc
+                    "Expected nodes.expression after '*' or '/'", loc
                 )
 
             constructor = FACTOR_OPS[op_type]
             left = constructor(left, right, loc)
         return left
 
-    def try_parse_unary(self) -> Optional[Expression]:
+    def try_parse_unary(self) -> Optional[nodes.Expression]:
         if self.match(TokenType.NOT):
             loc = self._loc()
             self.advance()
 
             operand = self.try_parse_primary()
             if operand is None:
-                raise MissingExpressionError("Expected expression after '!'", loc)
+                raise MissingExpressionError("Expected nodes.expression after '!'", loc)
 
-            return NotExpression(operand, loc)
+            return nodes.NotExpression(operand, loc)
 
         if self.match(TokenType.MINUS):
             loc = self._loc()
@@ -429,13 +437,13 @@ class Parser:
 
             operand = self.try_parse_primary()
             if operand is None:
-                raise MissingExpressionError("Expected expression after '-'", loc)
+                raise MissingExpressionError("Expected nodes.expression after '-'", loc)
 
-            return UnaryMinusExpression(operand, loc)
+            return nodes.UnaryMinusExpression(operand, loc)
 
         return self.try_parse_primary()
 
-    def try_parse_primary(self) -> Optional[Expression]:
+    def try_parse_primary(self) -> Optional[nodes.Expression]:
         if expr := self.parse_call_or_identifier_expression():
             return expr
 
@@ -444,13 +452,13 @@ class Parser:
 
         return self._try_parse_literal()
 
-    def _try_parse_literal(self) -> Optional[Expression]:
+    def _try_parse_literal(self) -> Optional[nodes.Expression]:
         LITERALS = {
-            TokenType.INT_LITERAL: lambda t, loc: IntLiteral(t.value, loc),
-            TokenType.FLOAT_LITERAL: lambda t, loc: FloatLiteral(t.value, loc),
-            TokenType.STRING_LITERAL: lambda t, loc: StringLiteral(t.value, loc),
-            TokenType.TRUE: lambda t, loc: BoolLiteral(True, loc),
-            TokenType.FALSE: lambda t, loc: BoolLiteral(False, loc),
+            TokenType.INT_LITERAL: lambda t, loc: nodes.IntLiteral(t.value, loc),
+            TokenType.FLOAT_LITERAL: lambda t, loc: nodes.FloatLiteral(t.value, loc),
+            TokenType.STRING_LITERAL: lambda t, loc: nodes.StringLiteral(t.value, loc),
+            TokenType.TRUE: lambda t, loc: nodes.BoolLiteral(True, loc),
+            TokenType.FALSE: lambda t, loc: nodes.BoolLiteral(False, loc),
         }
 
         tt = self.current_token.type
@@ -466,7 +474,7 @@ class Parser:
 
         return factory(token, loc)
 
-    def try_parse_assign_or_call_statement(self) -> Optional[Statement]:
+    def try_parse_assign_or_call_statement(self) -> Optional[nodes.Statement]:
         loc = self._loc()
 
         if (left := self.parse_call_or_identifier_expression()) is None:
@@ -475,43 +483,45 @@ class Parser:
         if self.match(TokenType.ASSIGN):
             self.advance()
 
-            if isinstance(left, FunctionCall):
+            if isinstance(left, nodes.FunctionCall):
                 raise InvalidSyntaxError("Cannot assign to a function call", loc)
 
             if (expr := self.try_parse_expression()) is None:
                 raise MissingExpressionError(
-                    "Expected expression after '='", self._loc()
+                    "Expected nodes.expression after '='", self._loc()
                 )
 
             self.consume(TokenType.SEMICOLON, "Expected ';' after assignment")
 
-            return AssignmentStatement(left.name, expr, loc)
+            return nodes.AssignmentStatement(left.name, expr, loc)
 
-        self.consume(TokenType.SEMICOLON, "Expected ';' after statement")
+        self.consume(TokenType.SEMICOLON, "Expected ';' after nodes.statement")
 
-        if isinstance(left, FunctionCall):
-            return FunctionCallStatement(left.name, left.arguments, loc)
+        if isinstance(left, nodes.FunctionCall):
+            return nodes.FunctionCallStatement(left.name, left.arguments, loc)
 
         raise InvalidSyntaxError(
-            "Statement has no effect (variable without assignment)", loc
+            "nodes.Statement has no effect (nodes.variable without assignment)", loc
         )
 
-    def try_parse_expression(self) -> Optional[Expression]:
+    def try_parse_expression(self) -> Optional[nodes.Expression]:
         return self.try_parse_logic_or()
 
-    def try_parse_parenthesized_expression(self) -> Optional[Expression]:
+    def try_parse_parenthesized_expression(self) -> Optional[nodes.Expression]:
         if not self.match(TokenType.LPAREN):
             return None
 
         self.advance()
         expr = self.try_parse_expression()
         if expr is None:
-            self.error("Expected expression inside parentheses")
+            raise MissingExpressionError(
+                "Expected nodes.expression inside parentheses", self._loc()
+            )
 
         self.consume(TokenType.RPAREN, "Expected ')'")
         return expr
 
-    def parse_call_or_identifier_expression(self) -> Expression:
+    def parse_call_or_identifier_expression(self) -> Optional[nodes.Expression]:
         if not self.match(TokenType.IDENTIFIER):
             return None
 
@@ -526,11 +536,11 @@ class Parser:
                 args = self.parse_argument_list()
 
             self.consume(TokenType.RPAREN, "Expected ')'")
-            return FunctionCall(name, args, loc)
+            return nodes.FunctionCall(name, args, loc)
         else:
-            return Variable(name, loc)
+            return nodes.Variable(name, loc)
 
-    def parse_argument_list(self) -> list[Expression]:
+    def parse_argument_list(self) -> List[nodes.Expression]:
         args = []
         if arg := self.try_parse_expression():
             args.append(arg)
@@ -543,11 +553,11 @@ class Parser:
                     args.append(next_arg)
                 else:
                     raise MissingExpressionError(
-                        "Expected expression after comma", self._loc()
+                        "Expected nodes.expression after comma", self._loc()
                     )
         return args
 
-    def try_parse_match_statement(self) -> Optional[Statement]:
+    def try_parse_match_statement(self) -> Optional[nodes.MatchStatement]:
         if not self.match(TokenType.MATCH):
             return None
 
@@ -565,7 +575,7 @@ class Parser:
             if case_branch.is_default:
                 if default_case is not None:
                     raise DuplicateDefinitionError(
-                        "Multiple default cases in match statement",
+                        "Multiple default cases in match nodes.statement",
                         case_branch.location,
                     )
                 default_case = case_branch
@@ -574,9 +584,9 @@ class Parser:
 
         self.consume(TokenType.RBRACE, "Expected '}' after match cases")
 
-        return MatchStatement(subjects, cases, default_case, loc)
+        return nodes.MatchStatement(subjects, cases, default_case, loc)
 
-    def try_parse_case_branch(self) -> Optional[MatchCase]:
+    def try_parse_case_branch(self) -> Optional[nodes.MatchCase]:
         if (condition_result := self.try_parse_case_condition()) is None:
             return None
 
@@ -587,15 +597,15 @@ class Parser:
 
         if (body := self.try_parse_block()) is None:
             raise MissingStatementError(
-                "Expected block in match case body", self._loc()
+                "Expected nodes.block in match case body", self._loc()
             )
 
         if self.match(TokenType.COMMA):
             self.advance()
 
-        return MatchCase(condition, body, loc, is_default)
+        return nodes.MatchCase(condition, body, loc, is_default)
 
-    def try_parse_match_header(self):
+    def try_parse_match_header(self) -> List[Tuple[nodes.Expression, Optional[str]]]:
         subjects = []
         aliases_seen = set()
 
@@ -605,7 +615,7 @@ class Parser:
         first_expr = self.try_parse_expression()
         if not first_expr:
             raise MissingExpressionError(
-                "Expected expression or '{' after 'match'", self._loc()
+                "Expected nodes.expression or '{' after 'match'", self._loc()
             )
 
         alias = None
@@ -630,7 +640,7 @@ class Parser:
             expr = self.try_parse_expression()
             if not expr:
                 raise MissingExpressionError(
-                    "Expected expression after comma in match header", self._loc()
+                    "Expected nodes.expression after comma in match header", self._loc()
                 )
 
             alias = None
@@ -653,7 +663,9 @@ class Parser:
 
         return subjects
 
-    def try_parse_case_condition(self):
+    def try_parse_case_condition(
+        self,
+    ) -> Optional[Tuple[Union[nodes.Pattern, nodes.Expression, None], bool]]:
         if pattern := self.try_parse_positional_pattern():
             return pattern, False
 
@@ -666,7 +678,7 @@ class Parser:
 
         return None
 
-    def try_parse_positional_pattern(self):
+    def try_parse_positional_pattern(self) -> Optional[nodes.PositionalPattern]:
         if not self.match(TokenType.LBRACKET):
             return None
 
@@ -678,28 +690,32 @@ class Parser:
         if not self.match(TokenType.RBRACKET):
             patterns = self.try_parse_pattern_list()
 
-        self.consume(TokenType.RBRACKET, "Expected ']' after pattern list")
+        self.consume(TokenType.RBRACKET, "Expected ']' after nodes.pattern list")
 
-        return PositionalPattern(patterns, loc)
+        return nodes.PositionalPattern(patterns, loc)
 
-    def try_parse_pattern_list(self):
+    def try_parse_pattern_list(self) -> List[nodes.Pattern]:
         patterns = []
 
         if first := self.try_parse_and_pattern():
             patterns.append(first)
         else:
-            raise InvalidSyntaxError("Expected pattern in pattern list", self._loc())
+            raise InvalidSyntaxError(
+                "Expected nodes.pattern in nodes.pattern list", self._loc()
+            )
 
         while self.match(TokenType.COMMA):
             self.advance()
             if nxt := self.try_parse_and_pattern():
                 patterns.append(nxt)
             else:
-                raise InvalidSyntaxError("Expected pattern after comma", self._loc())
+                raise InvalidSyntaxError(
+                    "Expected nodes.pattern after comma", self._loc()
+                )
 
         return patterns
 
-    def try_parse_and_pattern(self):
+    def try_parse_and_pattern(self) -> Optional[nodes.Pattern]:
         left = self.try_parse_single_pattern()
         if not left:
             return None
@@ -709,40 +725,40 @@ class Parser:
             self.advance()
             right = self.try_parse_single_pattern()
             if not right:
-                raise InvalidSyntaxError("Expected pattern after 'AND'", loc)
+                raise InvalidSyntaxError("Expected nodes.pattern after 'AND'", loc)
 
-            left = AndPattern(left, right, loc)
+            left = nodes.AndPattern(left, right, loc)
 
         return left
 
-    def try_parse_single_pattern(self) -> Optional[Pattern]:
+    def try_parse_single_pattern(self) -> Optional[nodes.Pattern]:
         # Wildcard (_)
         if pat := self.try_parse_wildcard_pattern():
             return pat
 
-        # Type Pattern (is int)
+        # Type nodes.Pattern (is int)
         if pat := self.try_parse_type_pattern():
             return pat
 
-        # Relational Pattern (> 5)
+        # Relational nodes.Pattern (> 5)
         if pat := self.try_parse_relational_pattern():
             return pat
 
-        # Constant Pattern (10, "hello")
+        # Constant nodes.Pattern (10, "hello")
         if pat := self.try_parse_constant_pattern():
             return pat
 
         return None
 
-    def try_parse_wildcard_pattern(self):
+    def try_parse_wildcard_pattern(self) -> Optional[nodes.WildcardPattern]:
         if not self.match(TokenType.WILDCARD):
             return None
 
         loc = self._loc()
         self.advance()
-        return WildcardPattern(loc)
+        return nodes.WildcardPattern(loc)
 
-    def try_parse_type_pattern(self) -> Optional[TypePattern]:
+    def try_parse_type_pattern(self) -> Optional[nodes.TypePattern]:
         if not self.match(TokenType.IS):
             return None
 
@@ -762,9 +778,9 @@ class Parser:
         type_name = TYPE_NAMES[self.current_token.type]
         self.advance()
 
-        return TypePattern(type_name, loc)
+        return nodes.TypePattern(type_name, loc)
 
-    def try_parse_relational_pattern(self) -> Optional[RelationalPattern]:
+    def try_parse_relational_pattern(self) -> Optional[nodes.RelationalPattern]:
         OP_MAP = {
             TokenType.GREATER: ">",
             TokenType.LESS: "<",
@@ -784,14 +800,14 @@ class Parser:
 
         if (expr := self.try_parse_expression()) is None:
             raise MissingExpressionError(
-                "Expected expression in relational pattern", loc
+                "Expected nodes.expression in relational nodes.pattern", loc
             )
 
-        return RelationalPattern(op_str, expr, loc)
+        return nodes.RelationalPattern(op_str, expr, loc)
 
-    def try_parse_constant_pattern(self):
+    def try_parse_constant_pattern(self) -> Optional[nodes.ConstantPattern]:
         literal = self._try_parse_literal()
         if literal is None:
             return None
 
-        return ConstantPattern(literal, literal.location)
+        return nodes.ConstantPattern(literal, literal.location)

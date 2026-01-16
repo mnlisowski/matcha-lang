@@ -1,30 +1,33 @@
 #!/usr/bin/env python3
 
-
 import sys
 import io
+from typing import TextIO, Any
 
 from src.lexer.reader import CharReader
-from src.lexer.lexer import Lexer
+from src.lexer.lexer import Lexer, LexerError
 from src.parser.parser import Parser, ParserError
 from src.interpreter.interpreter import Interpreter, RuntimeError
 # from src.ast_nodes import FunctionCall, SourceLocation
 
 
-def run(stream):
+def run(stream: TextIO) -> bool:
     errors = []
 
-    def error_handler(error):
-        errors.append(error)
 
     reader = CharReader(stream)
     lexer = Lexer(reader)
-    parser = Parser(lexer, error_handler)
+    parser = Parser(lexer, errors.append)
     program = parser.parse_program()
 
     if errors:
         for err in errors:
-            print(f"Błąd parsowania: {err}", file=sys.stderr)
+            if isinstance(err, LexerError):
+                print(f"Błąd leksykalny: {err}", file=sys.stderr)
+            elif isinstance(err, ParserError):
+                print(f"Błąd parsowania: {err}", file=sys.stderr)
+            else:
+                print(f"Błąd: {err}", file=sys.stderr)
         return False
 
     interpreter = Interpreter()
@@ -40,7 +43,7 @@ def run(stream):
     return True
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Użycie:")
         sys.exit(1)

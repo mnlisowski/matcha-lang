@@ -1,10 +1,11 @@
+from typing import TextIO
 from src.common.position import Position
 
 EOF = "\4"
 
 
 class CharReader:
-    def __init__(self, stream):
+    def __init__(self, stream: TextIO) -> None:
         self.stream = stream
         self.line = 1
         self.col = 0
@@ -17,23 +18,23 @@ class CharReader:
 
         self.advance()
 
-    def _next_line(self):
+    def _next_line(self) -> None:
         self.line += 1
         self.col = 1
 
-    def _next_column(self):
+    def _next_column(self) -> None:
         self.col += 1
 
-    def current(self):
+    def current(self) -> str:
         return self.current_char
 
-    def check_next(self):
+    def check_next(self) -> str:
         return self._next_char
 
-    def position(self):
+    def position(self) -> Position:
         return Position(self.line, self.col)
 
-    def advance(self):
+    def advance(self) -> str:
         if self.current_char == EOF:
             return EOF
         if self.current_char == "\n":

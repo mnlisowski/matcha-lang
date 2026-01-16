@@ -1,6 +1,7 @@
+from typing import Dict, Optional
 from src.lexer.token_type import TokenType
 
-KEYWORDS = {
+KEYWORDS: Dict[str, TokenType] = {
     "fun": TokenType.FUN,
     "break": TokenType.BREAK,
     "continue": TokenType.CONTINUE,
@@ -27,7 +28,7 @@ KEYWORDS = {
 }
 
 
-SINGLE_CHAR_TOKENS = {
+SINGLE_CHAR_TOKENS: Dict[str, TokenType] = {
     "+": TokenType.PLUS,
     "-": TokenType.MINUS,
     "*": TokenType.MULTIPLY,
@@ -42,7 +43,7 @@ SINGLE_CHAR_TOKENS = {
     ";": TokenType.SEMICOLON,
 }
 
-DOUBLE_CHAR_TOKENS = {
+DOUBLE_CHAR_TOKENS: Dict[str, Dict[Optional[str], TokenType]] = {
     "=": {"=": TokenType.EQUAL, ">": TokenType.ARROW, None: TokenType.ASSIGN},
     "!": {"=": TokenType.NOT_EQUAL, None: TokenType.NOT},
     "<": {"=": TokenType.LESS_EQ, None: TokenType.LESS},

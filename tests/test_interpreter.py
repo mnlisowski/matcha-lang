@@ -10,7 +10,7 @@ from src.interpreter.interpreter import (
     NameError as InterpreterNameError,
     ValueError as InterpreterValueError,
 )
-from src.ast.ast_nodes import *
+import src.ast.ast_nodes as nodes
 
 
 class TestInterpreter(unittest.TestCase):
@@ -35,21 +35,21 @@ class TestInterpreter(unittest.TestCase):
 
         if function_name:
             arg_nodes = []
-            dummy_loc = SourceLocation(0, 0)
+            dummy_loc = nodes.SourceLocation(0, 0)
 
             for arg in args:
                 if isinstance(arg, bool):
-                    arg_nodes.append(BoolLiteral(arg, dummy_loc))
+                    arg_nodes.append(nodes.BoolLiteral(arg, dummy_loc))
                 elif isinstance(arg, int):
-                    arg_nodes.append(IntLiteral(arg, dummy_loc))
+                    arg_nodes.append(nodes.IntLiteral(arg, dummy_loc))
                 elif isinstance(arg, float):
-                    arg_nodes.append(FloatLiteral(arg, dummy_loc))
+                    arg_nodes.append(nodes.FloatLiteral(arg, dummy_loc))
                 elif isinstance(arg, str):
-                    arg_nodes.append(StringLiteral(arg, dummy_loc))
+                    arg_nodes.append(nodes.StringLiteral(arg, dummy_loc))
                 else:
                     raise ValueError(f"Unsupported argument type: {type(arg)}")
 
-            call_node = FunctionCall(function_name, arg_nodes, dummy_loc)
+            call_node = nodes.FunctionCall(function_name, arg_nodes, dummy_loc)
 
             return interpreter.interpret(call_node)
 

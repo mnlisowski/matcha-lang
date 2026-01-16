@@ -4,7 +4,7 @@ import io
 from src.lexer.reader import CharReader
 from src.lexer.lexer import Lexer
 from src.parser.parser import Parser, ParserError
-from src.ast.ast_nodes import *
+import src.ast.ast_nodes as nodes
 
 
 class TestParserIntegration(unittest.TestCase):
@@ -29,13 +29,11 @@ class TestParserIntegration(unittest.TestCase):
         return parser, errors
 
     def parse_expr(self, source_code: str):
-        """Helper for parsing a single expression."""
         parser, errors = self.parse_source(source_code)
         expr = parser.try_parse_expression()
         return expr, errors
 
     def parse_stmt(self, source_code: str):
-        """Helper for parsing a single statement."""
         parser, errors = self.parse_source(source_code)
         stmt = parser.try_parse_statement()
         return stmt, errors
@@ -49,7 +47,7 @@ class TestParserIntegration(unittest.TestCase):
         self.assertFalse(errors)
 
         self.assertEqual(expr.value, 42)
-        self.assertIsInstance(expr, IntLiteral)
+        self.assertIsInstance(expr, nodes.IntLiteral)
         self.assertIsNotNone(expr.location)
 
     def test_float_literal(self):
@@ -58,14 +56,14 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         self.assertAlmostEqual(expr.value, 3.14159, places=5)
-        self.assertIsInstance(expr, FloatLiteral)
+        self.assertIsInstance(expr, nodes.FloatLiteral)
 
     def test_string_literal(self):
         """Test string literal parsing."""
         expr, errors = self.parse_expr('"hello world"')
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, StringLiteral)
+        self.assertIsInstance(expr, nodes.StringLiteral)
         self.assertEqual(expr.value, "hello world")
 
     def test_boolean_literals(self):
@@ -73,7 +71,7 @@ class TestParserIntegration(unittest.TestCase):
         # True
         expr_true, errors1 = self.parse_expr("true")
         self.assertFalse(errors1)
-        self.assertIsInstance(expr_true, BoolLiteral)
+        self.assertIsInstance(expr_true, nodes.BoolLiteral)
         self.assertEqual(expr_true.value, True)
 
         # False
@@ -85,7 +83,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("counter")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Variable)
+        self.assertIsInstance(expr, nodes.Variable)
         self.assertEqual(expr.name, "counter")
         self.assertIsNotNone(expr.location)
 
@@ -94,26 +92,26 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("foo(1, x, 2 + 3)")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, FunctionCall)
+        self.assertIsInstance(expr, nodes.FunctionCall)
         self.assertEqual(expr.name, "foo")
         self.assertEqual(len(expr.arguments), 3)
 
         # First argument: literal 1
         self.assertEqual(expr.arguments[0].value, 1)
 
-        # Second argument: variable x
-        self.assertIsInstance(expr.arguments[1], Variable)
+        # Second argument: nodes.variable x
+        self.assertIsInstance(expr.arguments[1], nodes.Variable)
         self.assertEqual(expr.arguments[1].name, "x")
 
-        # Third argument: expression 2 + 3
-        self.assertIsInstance(expr.arguments[2], AddExpression)
+        # Third argument: nodes.expression 2 + 3
+        self.assertIsInstance(expr.arguments[2], nodes.AddExpression)
 
     def test_function_call_no_arguments(self):
         """Test function call without arguments."""
         expr, errors = self.parse_expr("getTime()")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, FunctionCall)
+        self.assertIsInstance(expr, nodes.FunctionCall)
         self.assertEqual(expr.name, "getTime")
         self.assertEqual(len(expr.arguments), 0)
 
@@ -122,7 +120,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("(42)")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, IntLiteral)
+        self.assertIsInstance(expr, nodes.IntLiteral)
         self.assertEqual(expr.value, 42)
 
     def test_deeply_nested_parentheses(self):
@@ -130,7 +128,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("((((x))))")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, Variable)
+        self.assertIsInstance(expr, nodes.Variable)
         self.assertEqual(expr.name, "x")
 
     # 2. UNARY EXPRESSIONS
@@ -140,7 +138,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("-42")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, UnaryMinusExpression)
+        self.assertIsInstance(expr, nodes.UnaryMinusExpression)
         self.assertEqual(expr.operand.value, 42)
         self.assertIsNotNone(expr.location)
 
@@ -149,7 +147,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("!true")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, NotExpression)
+        self.assertIsInstance(expr, nodes.NotExpression)
         self.assertEqual(expr.operand.value, True)
 
     def test_double_unary_minus(self):
@@ -164,8 +162,8 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("!(x > 5)")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, NotExpression)
-        self.assertIsInstance(expr.operand, GreaterExpression)
+        self.assertIsInstance(expr, nodes.NotExpression)
+        self.assertIsInstance(expr.operand, nodes.GreaterExpression)
 
     # 3. BINARY ARITHMETIC EXPRESSIONS
 
@@ -174,7 +172,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("1 + 2")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, AddExpression)
+        self.assertIsInstance(expr, nodes.AddExpression)
         self.assertEqual(expr.left.value, 1)
         self.assertEqual(expr.right.value, 2)
 
@@ -183,7 +181,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("10 - 3")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, SubtractExpression)
+        self.assertIsInstance(expr, nodes.SubtractExpression)
         self.assertEqual(expr.left.value, 10)
         self.assertEqual(expr.right.value, 3)
 
@@ -192,7 +190,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("4 * 5")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, MultiplyExpression)
+        self.assertIsInstance(expr, nodes.MultiplyExpression)
         self.assertEqual(expr.left.value, 4)
         self.assertEqual(expr.right.value, 5)
 
@@ -201,7 +199,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("20 / 4")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, DivideExpression)
+        self.assertIsInstance(expr, nodes.DivideExpression)
         self.assertEqual(expr.left.value, 20)
         self.assertEqual(expr.right.value, 4)
 
@@ -211,11 +209,11 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         # Root should be subtraction
-        self.assertIsInstance(expr, SubtractExpression)
+        self.assertIsInstance(expr, nodes.SubtractExpression)
         # Right operand should be 2
         self.assertEqual(expr.right.value, 2)
         # Left operand should be (10 - 3)
-        self.assertIsInstance(expr.left, SubtractExpression)
+        self.assertIsInstance(expr.left, nodes.SubtractExpression)
         self.assertEqual(expr.left.left.value, 10)
         self.assertEqual(expr.left.right.value, 3)
 
@@ -225,11 +223,11 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         # Root: addition
-        self.assertIsInstance(expr, AddExpression)
+        self.assertIsInstance(expr, nodes.AddExpression)
         self.assertEqual(expr.left.value, 2)
 
         # Right side: multiplication
-        self.assertIsInstance(expr.right, MultiplyExpression)
+        self.assertIsInstance(expr.right, nodes.MultiplyExpression)
         self.assertEqual(expr.right.left.value, 3)
         self.assertEqual(expr.right.right.value, 4)
 
@@ -240,7 +238,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("a < b")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, LessExpression)
+        self.assertIsInstance(expr, nodes.LessExpression)
         self.assertEqual(expr.left.name, "a")
         self.assertEqual(expr.right.name, "b")
 
@@ -249,7 +247,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("x <= 10")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, LessEqualExpression)
+        self.assertIsInstance(expr, nodes.LessEqualExpression)
         self.assertEqual(expr.left.name, "x")
         self.assertEqual(expr.right.value, 10)
 
@@ -258,7 +256,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("count > 0")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, GreaterExpression)
+        self.assertIsInstance(expr, nodes.GreaterExpression)
         self.assertEqual(expr.left.name, "count")
         self.assertEqual(expr.right.value, 0)
 
@@ -267,7 +265,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("age >= 18")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, GreaterEqualExpression)
+        self.assertIsInstance(expr, nodes.GreaterEqualExpression)
         self.assertEqual(expr.left.name, "age")
         self.assertEqual(expr.right.value, 18)
 
@@ -276,9 +274,9 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("2 + 3 > 4")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, GreaterExpression)
+        self.assertIsInstance(expr, nodes.GreaterExpression)
         # Left side should be addition
-        self.assertIsInstance(expr.left, AddExpression)
+        self.assertIsInstance(expr.left, nodes.AddExpression)
         self.assertEqual(expr.right.value, 4)
 
     # 5. EQUALITY EXPRESSIONS
@@ -288,7 +286,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("x == y")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, EqualExpression)
+        self.assertIsInstance(expr, nodes.EqualExpression)
         self.assertEqual(expr.left.name, "x")
         self.assertEqual(expr.right.name, "y")
 
@@ -297,7 +295,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("status != 0")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, NotEqualExpression)
+        self.assertIsInstance(expr, nodes.NotEqualExpression)
         self.assertEqual(expr.left.name, "status")
         self.assertEqual(expr.right.value, 0)
 
@@ -308,7 +306,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("a and b")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, AndExpression)
+        self.assertIsInstance(expr, nodes.AndExpression)
         self.assertEqual(expr.left.name, "a")
         self.assertEqual(expr.right.name, "b")
 
@@ -317,7 +315,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("x or y")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, OrExpression)
+        self.assertIsInstance(expr, nodes.OrExpression)
         self.assertEqual(expr.left.name, "x")
         self.assertEqual(expr.right.name, "y")
 
@@ -327,11 +325,11 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         # Root: OR
-        self.assertIsInstance(expr, OrExpression)
+        self.assertIsInstance(expr, nodes.OrExpression)
         self.assertEqual(expr.left.name, "a")
 
         # Right side: AND
-        self.assertIsInstance(expr.right, AndExpression)
+        self.assertIsInstance(expr.right, nodes.AndExpression)
         self.assertEqual(expr.right.left.name, "b")
         self.assertEqual(expr.right.right.name, "c")
 
@@ -355,32 +353,32 @@ class TestParserIntegration(unittest.TestCase):
         self.assertFalse(errors)
 
         # Root: OR
-        self.assertIsInstance(expr, OrExpression)
+        self.assertIsInstance(expr, nodes.OrExpression)
         self.assertEqual(expr.right.name, "z")
 
         # Left of OR: AND
         and_expr = expr.left
-        self.assertIsInstance(and_expr, AndExpression)
+        self.assertIsInstance(and_expr, nodes.AndExpression)
 
         # Right of AND: x == y
         eq_expr = and_expr.right
-        self.assertIsInstance(eq_expr, EqualExpression)
+        self.assertIsInstance(eq_expr, nodes.EqualExpression)
         self.assertEqual(eq_expr.left.name, "x")
         self.assertEqual(eq_expr.right.name, "y")
 
         # Left of AND: (...) > 10
         gt_expr = and_expr.left
-        self.assertIsInstance(gt_expr, GreaterExpression)
+        self.assertIsInstance(gt_expr, nodes.GreaterExpression)
         self.assertEqual(gt_expr.right.value, 10)
 
         # Left of >: 2 + (...)
         add_expr = gt_expr.left
-        self.assertIsInstance(add_expr, AddExpression)
+        self.assertIsInstance(add_expr, nodes.AddExpression)
         self.assertEqual(add_expr.left.value, 2)
 
         # Right of +: 3 * 4
         mul_expr = add_expr.right
-        self.assertIsInstance(mul_expr, MultiplyExpression)
+        self.assertIsInstance(mul_expr, nodes.MultiplyExpression)
         self.assertEqual(mul_expr.left.value, 3)
         self.assertEqual(mul_expr.right.value, 4)
 
@@ -391,23 +389,23 @@ class TestParserIntegration(unittest.TestCase):
     # 8. ASSIGNMENT STATEMENT
 
     def test_simple_assignment(self):
-        """Test simple variable assignment."""
+        """Test simple nodes.variable assignment."""
         stmt, errors = self.parse_stmt("x = 10;")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, AssignmentStatement)
+        self.assertIsInstance(stmt, nodes.AssignmentStatement)
         self.assertEqual(stmt.variable_name, "x")
-        self.assertIsInstance(stmt.expression, IntLiteral)
+        self.assertIsInstance(stmt.expression, nodes.IntLiteral)
         self.assertEqual(stmt.expression.value, 10)
 
     def test_assignment_with_expression(self):
-        """Test assignment with complex expression."""
+        """Test assignment with complex nodes.expression."""
         stmt, errors = self.parse_stmt("result = a + b * c;")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, AssignmentStatement)
+        self.assertIsInstance(stmt, nodes.AssignmentStatement)
         self.assertEqual(stmt.variable_name, "result")
-        self.assertIsInstance(stmt.expression, AddExpression)
+        self.assertIsInstance(stmt.expression, nodes.AddExpression)
 
     def test_assignment_chain_not_allowed(self):
         """Test that assignment doesn't chain (not an expression)."""
@@ -422,7 +420,7 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("print(x);")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, FunctionCallStatement)
+        self.assertIsInstance(stmt, nodes.FunctionCallStatement)
         self.assertEqual(stmt.name, "print")
         self.assertEqual(len(stmt.arguments), 1)
         self.assertEqual(stmt.arguments[0].name, "x")
@@ -432,7 +430,7 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("refresh();")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, FunctionCallStatement)
+        self.assertIsInstance(stmt, nodes.FunctionCallStatement)
         self.assertEqual(stmt.name, "refresh")
         self.assertEqual(len(stmt.arguments), 0)
 
@@ -443,38 +441,38 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("{}")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, Block)
+        self.assertIsInstance(stmt, nodes.Block)
         self.assertEqual(len(stmt.statements), 0)
 
     def test_block_with_statements(self):
-        """Test block with multiple statements."""
+        """Test nodes.block with multiple statements."""
         stmt, errors = self.parse_stmt("{ x = 1; y = 2; return x; }")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, Block)
+        self.assertIsInstance(stmt, nodes.Block)
         self.assertEqual(len(stmt.statements), 3)
 
         # First statement: assignment
-        self.assertIsInstance(stmt.statements[0], AssignmentStatement)
+        self.assertIsInstance(stmt.statements[0], nodes.AssignmentStatement)
         self.assertEqual(stmt.statements[0].variable_name, "x")
 
         # Second statement: assignment
-        self.assertIsInstance(stmt.statements[1], AssignmentStatement)
+        self.assertIsInstance(stmt.statements[1], nodes.AssignmentStatement)
         self.assertEqual(stmt.statements[1].variable_name, "y")
 
         # Third statement: return
-        self.assertIsInstance(stmt.statements[2], ReturnStatement)
+        self.assertIsInstance(stmt.statements[2], nodes.ReturnStatement)
 
     def test_nested_blocks(self):
         """Test nested block statements."""
         stmt, errors = self.parse_stmt("{ { x = 1; } }")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, Block)
+        self.assertIsInstance(stmt, nodes.Block)
         self.assertEqual(len(stmt.statements), 1)
 
         inner_block = stmt.statements[0]
-        self.assertIsInstance(inner_block, Block)
+        self.assertIsInstance(inner_block, nodes.Block)
         self.assertEqual(len(inner_block.statements), 1)
 
     # 11. IF STATEMENT
@@ -484,14 +482,14 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("if (x > 0) { return x; }")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, IfStatement)
+        self.assertIsInstance(stmt, nodes.IfStatement)
 
         # Check condition
-        self.assertIsInstance(stmt.condition, GreaterExpression)
+        self.assertIsInstance(stmt.condition, nodes.GreaterExpression)
         self.assertEqual(stmt.condition.left.name, "x")
 
         # Check then branch
-        self.assertIsInstance(stmt.then_branch, Block)
+        self.assertIsInstance(stmt.then_branch, nodes.Block)
         self.assertEqual(len(stmt.then_branch.statements), 1)
 
         # Check no else branch
@@ -502,21 +500,21 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("if (flag) { x = 1; } else { x = 0; }")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, IfStatement)
+        self.assertIsInstance(stmt, nodes.IfStatement)
 
         # Check condition
-        self.assertIsInstance(stmt.condition, Variable)
+        self.assertIsInstance(stmt.condition, nodes.Variable)
         self.assertEqual(stmt.condition.name, "flag")
 
         # Check then branch
-        self.assertIsInstance(stmt.then_branch, Block)
+        self.assertIsInstance(stmt.then_branch, nodes.Block)
         then_stmt = stmt.then_branch.statements[0]
         self.assertEqual(then_stmt.variable_name, "x")
         self.assertEqual(then_stmt.expression.value, 1)
 
         # Check else branch
         self.assertIsNotNone(stmt.else_branch)
-        self.assertIsInstance(stmt.else_branch, Block)
+        self.assertIsInstance(stmt.else_branch, nodes.Block)
         else_stmt = stmt.else_branch.statements[0]
         self.assertEqual(else_stmt.variable_name, "x")
         self.assertEqual(else_stmt.expression.value, 0)
@@ -537,13 +535,13 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, IfStatement)
+        self.assertIsInstance(stmt, nodes.IfStatement)
 
         # Check else branch contains another if
         else_block = stmt.else_branch
-        self.assertIsInstance(else_block, Block)
+        self.assertIsInstance(else_block, nodes.Block)
         nested_if = else_block.statements[0]
-        self.assertIsInstance(nested_if, IfStatement)
+        self.assertIsInstance(nested_if, nodes.IfStatement)
 
     # 12. WHILE STATEMENT
 
@@ -552,19 +550,19 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("while (i < 10) { i = i + 1; }")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, WhileStatement)
+        self.assertIsInstance(stmt, nodes.WhileStatement)
 
         # Check condition
-        self.assertIsInstance(stmt.condition, LessExpression)
+        self.assertIsInstance(stmt.condition, nodes.LessExpression)
         self.assertEqual(stmt.condition.left.name, "i")
         self.assertEqual(stmt.condition.right.value, 10)
 
         # Check body
-        self.assertIsInstance(stmt.body, Block)
+        self.assertIsInstance(stmt.body, nodes.Block)
         self.assertEqual(len(stmt.body.statements), 1)
 
         body_stmt = stmt.body.statements[0]
-        self.assertIsInstance(body_stmt, AssignmentStatement)
+        self.assertIsInstance(body_stmt, nodes.AssignmentStatement)
         self.assertEqual(body_stmt.variable_name, "i")
 
     def test_while_with_complex_condition(self):
@@ -572,8 +570,8 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("while (running and count < max) { }")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, WhileStatement)
-        self.assertIsInstance(stmt.condition, AndExpression)
+        self.assertIsInstance(stmt, nodes.WhileStatement)
+        self.assertIsInstance(stmt.condition, nodes.AndExpression)
 
     def test_nested_while_loops(self):
         """Test nested while loops."""
@@ -587,10 +585,10 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, WhileStatement)
+        self.assertIsInstance(stmt, nodes.WhileStatement)
 
         inner_while = stmt.body.statements[0]
-        self.assertIsInstance(inner_while, WhileStatement)
+        self.assertIsInstance(inner_while, nodes.WhileStatement)
 
     # 13. RETURN STATEMENT
 
@@ -599,7 +597,7 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("return 42;")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, ReturnStatement)
+        self.assertIsInstance(stmt, nodes.ReturnStatement)
         self.assertIsNotNone(stmt.expression)
         self.assertEqual(stmt.expression.value, 42)
 
@@ -608,7 +606,7 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("return;")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, ReturnStatement)
+        self.assertIsInstance(stmt, nodes.ReturnStatement)
         self.assertIsNone(stmt.expression)
 
     def test_return_with_expression(self):
@@ -616,8 +614,8 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt("return a + b * c;")
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, ReturnStatement)
-        self.assertIsInstance(stmt.expression, AddExpression)
+        self.assertIsInstance(stmt, nodes.ReturnStatement)
+        self.assertIsInstance(stmt.expression, nodes.AddExpression)
 
     # 14. NESTED CONTROL FLOW
 
@@ -635,11 +633,11 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, WhileStatement)
+        self.assertIsInstance(stmt, nodes.WhileStatement)
 
         # Get if statement from while body
         if_stmt = stmt.body.statements[0]
-        self.assertIsInstance(if_stmt, IfStatement)
+        self.assertIsInstance(if_stmt, nodes.IfStatement)
 
         # Check if has both branches
         self.assertIsNotNone(if_stmt.then_branch)
@@ -662,15 +660,15 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, WhileStatement)
-        self.assertIsInstance(stmt.condition, Variable)
+        self.assertIsInstance(stmt, nodes.WhileStatement)
+        self.assertIsInstance(stmt.condition, nodes.Variable)
 
         # First level: if inside while
         outer_if = stmt.body.statements[0]
-        self.assertIsInstance(outer_if, IfStatement)
+        self.assertIsInstance(outer_if, nodes.IfStatement)
 
         # Check condition of outer if
-        self.assertIsInstance(outer_if.condition, LessExpression)
+        self.assertIsInstance(outer_if.condition, nodes.LessExpression)
         self.assertEqual(outer_if.condition.left.name, "i")
         self.assertEqual(outer_if.condition.right.value, 10)
 
@@ -679,18 +677,18 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(then_stmts), 2)
 
         # First: assignment
-        self.assertIsInstance(then_stmts[0], AssignmentStatement)
+        self.assertIsInstance(then_stmts[0], nodes.AssignmentStatement)
         self.assertEqual(then_stmts[0].variable_name, "i")
 
         # Second: nested if
         inner_if = then_stmts[1]
-        self.assertIsInstance(inner_if, IfStatement)
-        self.assertIsInstance(inner_if.condition, EqualExpression)
+        self.assertIsInstance(inner_if, nodes.IfStatement)
+        self.assertIsInstance(inner_if.condition, nodes.EqualExpression)
 
         # Else branch: return 0
         else_stmts = outer_if.else_branch.statements
         self.assertEqual(len(else_stmts), 1)
-        self.assertIsInstance(else_stmts[0], ReturnStatement)
+        self.assertIsInstance(else_stmts[0], nodes.ReturnStatement)
         self.assertEqual(else_stmts[0].expression.value, 0)
 
     # 15. FUNCTION DEFINITION
@@ -707,7 +705,7 @@ class TestParserIntegration(unittest.TestCase):
         func = prog.functions[0]
         self.assertEqual(func.name, "sayHello")
         self.assertEqual(len(func.params), 0)
-        self.assertIsInstance(func.body, Block)
+        self.assertIsInstance(func.body, nodes.Block)
 
     def test_function_with_parameters(self):
         """Test function definition with parameters."""
@@ -724,7 +722,7 @@ class TestParserIntegration(unittest.TestCase):
         # Check body
         self.assertEqual(len(func.body.statements), 1)
         return_stmt = func.body.statements[0]
-        self.assertIsInstance(return_stmt, ReturnStatement)
+        self.assertIsInstance(return_stmt, nodes.ReturnStatement)
 
     def test_function_empty_body(self):
         """Test function with empty body."""
@@ -760,13 +758,13 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(func.body.statements), 3)
 
         # First: assignment
-        self.assertIsInstance(func.body.statements[0], AssignmentStatement)
+        self.assertIsInstance(func.body.statements[0], nodes.AssignmentStatement)
 
-        # Second: if statement
-        self.assertIsInstance(func.body.statements[1], IfStatement)
+        # Second: if nodes.statement
+        self.assertIsInstance(func.body.statements[1], nodes.IfStatement)
 
         # Third: return
-        self.assertIsInstance(func.body.statements[2], ReturnStatement)
+        self.assertIsInstance(func.body.statements[2], nodes.ReturnStatement)
 
     # 16. PROGRAM WITH MULTIPLE FUNCTIONS
 
@@ -835,8 +833,8 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(func_add.body.statements), 1)
 
         return_stmt = func_add.body.statements[0]
-        self.assertIsInstance(return_stmt, ReturnStatement)
-        self.assertIsInstance(return_stmt.expression, AddExpression)
+        self.assertIsInstance(return_stmt, nodes.ReturnStatement)
+        self.assertIsInstance(return_stmt.expression, nodes.AddExpression)
 
         # Verify 'multiply' function
         func_mult = program.functions[1]
@@ -846,7 +844,7 @@ class TestParserIntegration(unittest.TestCase):
 
         # Should have while loop
         while_stmt = func_mult.body.statements[2]
-        self.assertIsInstance(while_stmt, WhileStatement)
+        self.assertIsInstance(while_stmt, nodes.WhileStatement)
 
         # Verify 'main' function
         func_main = program.functions[2]
@@ -856,9 +854,9 @@ class TestParserIntegration(unittest.TestCase):
 
         # Check function calls in main
         sum_assign = stmts[2]
-        self.assertIsInstance(sum_assign, AssignmentStatement)
+        self.assertIsInstance(sum_assign, nodes.AssignmentStatement)
         self.assertEqual(sum_assign.variable_name, "sum")
-        self.assertIsInstance(sum_assign.expression, FunctionCall)
+        self.assertIsInstance(sum_assign.expression, nodes.FunctionCall)
         self.assertEqual(sum_assign.expression.name, "add")
 
         # Check arguments of add call
@@ -875,7 +873,7 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, MatchStatement)
+        self.assertIsInstance(stmt, nodes.MatchStatement)
         self.assertEqual(len(stmt.subjects), 0)
         self.assertEqual(len(stmt.cases), 0)
 
@@ -885,11 +883,11 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, MatchStatement)
+        self.assertIsInstance(stmt, nodes.MatchStatement)
         self.assertEqual(len(stmt.subjects), 1)
 
         subject_expr, alias = stmt.subjects[0]
-        self.assertIsInstance(subject_expr, Variable)
+        self.assertIsInstance(subject_expr, nodes.Variable)
         self.assertEqual(subject_expr.name, "x")
         self.assertIsNone(alias)
 
@@ -933,7 +931,7 @@ class TestParserIntegration(unittest.TestCase):
         case = stmt.default_case
         self.assertTrue(case.is_default)
         self.assertIsNone(case.condition)
-        self.assertIsInstance(case.body, Block)
+        self.assertIsInstance(case.body, nodes.Block)
 
     # 18. MATCH STATEMENT - EXPRESSION CONDITIONS
 
@@ -944,7 +942,7 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         case = stmt.cases[0]
-        self.assertIsInstance(case.condition, IntLiteral)
+        self.assertIsInstance(case.condition, nodes.IntLiteral)
         self.assertEqual(case.condition.value, 10)
         self.assertFalse(case.is_default)
 
@@ -955,7 +953,7 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         case = stmt.cases[0]
-        self.assertIsInstance(case.condition, Variable)
+        self.assertIsInstance(case.condition, nodes.Variable)
         self.assertEqual(case.condition.name, "y")
 
     def test_match_complex_expression_condition(self):
@@ -967,9 +965,9 @@ class TestParserIntegration(unittest.TestCase):
         case = stmt.cases[0]
 
         # Condition should be OrExpression
-        self.assertIsInstance(case.condition, OrExpression)
-        self.assertIsInstance(case.condition.left, GreaterExpression)
-        self.assertIsInstance(case.condition.right, LessExpression)
+        self.assertIsInstance(case.condition, nodes.OrExpression)
+        self.assertIsInstance(case.condition.left, nodes.GreaterExpression)
+        self.assertIsInstance(case.condition.right, nodes.LessExpression)
 
     def test_match_multiple_cases(self):
         """Test match with multiple cases."""
@@ -986,12 +984,12 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(stmt.cases), 2)
 
         # First case: literal 1
-        self.assertIsInstance(stmt.cases[0].condition, IntLiteral)
+        self.assertIsInstance(stmt.cases[0].condition, nodes.IntLiteral)
         self.assertEqual(stmt.cases[0].condition.value, 1)
         self.assertFalse(stmt.cases[0].is_default)
 
         # Second case: literal 2
-        self.assertIsInstance(stmt.cases[1].condition, IntLiteral)
+        self.assertIsInstance(stmt.cases[1].condition, nodes.IntLiteral)
         self.assertEqual(stmt.cases[1].condition.value, 2)
         self.assertFalse(stmt.cases[1].is_default)
 
@@ -1004,9 +1002,9 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         pos_pat = stmt.cases[0].condition
-        self.assertIsInstance(pos_pat, PositionalPattern)
+        self.assertIsInstance(pos_pat, nodes.PositionalPattern)
         self.assertEqual(len(pos_pat.patterns), 1)
-        self.assertIsInstance(pos_pat.patterns[0], WildcardPattern)
+        self.assertIsInstance(pos_pat.patterns[0], nodes.WildcardPattern)
 
     def test_match_constant_pattern(self):
         """Test match with constant patterns."""
@@ -1020,15 +1018,15 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(patterns), 3)
 
         # First: integer constant
-        self.assertIsInstance(patterns[0], ConstantPattern)
+        self.assertIsInstance(patterns[0], nodes.ConstantPattern)
         self.assertEqual(patterns[0].value.value, 1)
 
         # Second: string constant
-        self.assertIsInstance(patterns[1], ConstantPattern)
+        self.assertIsInstance(patterns[1], nodes.ConstantPattern)
         self.assertEqual(patterns[1].value.value, "hello")
 
         # Third: boolean constant
-        self.assertIsInstance(patterns[2], ConstantPattern)
+        self.assertIsInstance(patterns[2], nodes.ConstantPattern)
         self.assertEqual(patterns[2].value.value, True)
 
     def test_match_type_pattern(self):
@@ -1040,8 +1038,8 @@ class TestParserIntegration(unittest.TestCase):
         patterns = stmt.cases[0].condition.patterns
 
         self.assertEqual(len(patterns), 2)
-        self.assertIsInstance(patterns[0], TypePattern)
-        self.assertIsInstance(patterns[1], TypePattern)
+        self.assertIsInstance(patterns[0], nodes.TypePattern)
+        self.assertIsInstance(patterns[1], nodes.TypePattern)
 
     def test_match_relational_pattern(self):
         """Test match with relational patterns."""
@@ -1054,21 +1052,21 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(patterns), 4)
 
         # Check operators
-        self.assertIsInstance(patterns[0], RelationalPattern)
+        self.assertIsInstance(patterns[0], nodes.RelationalPattern)
         self.assertEqual(patterns[0].op, ">")
         self.assertEqual(patterns[0].expression.value, 5)
 
-        self.assertIsInstance(patterns[1], RelationalPattern)
+        self.assertIsInstance(patterns[1], nodes.RelationalPattern)
         self.assertEqual(patterns[1].op, "<")
 
-        self.assertIsInstance(patterns[2], RelationalPattern)
+        self.assertIsInstance(patterns[2], nodes.RelationalPattern)
         self.assertEqual(patterns[2].op, ">=")
 
-        self.assertIsInstance(patterns[3], RelationalPattern)
+        self.assertIsInstance(patterns[3], nodes.RelationalPattern)
         self.assertEqual(patterns[3].op, "<=")
 
     def test_match_and_pattern(self):
-        """Test match with AND pattern."""
+        """Test match with AND nodes.pattern."""
         source = "match x { [is int AND > 0] => {} }"
         stmt, errors = self.parse_stmt(source)
 
@@ -1077,13 +1075,13 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertEqual(len(patterns), 1)
         and_pat = patterns[0]
-        self.assertIsInstance(and_pat, AndPattern)
+        self.assertIsInstance(and_pat, nodes.AndPattern)
 
         # Left side: type pattern
-        self.assertIsInstance(and_pat.left, TypePattern)
+        self.assertIsInstance(and_pat.left, nodes.TypePattern)
 
         # Right side: relational pattern
-        self.assertIsInstance(and_pat.right, RelationalPattern)
+        self.assertIsInstance(and_pat.right, nodes.RelationalPattern)
         self.assertEqual(and_pat.right.op, ">")
 
     def test_match_complex_and_pattern(self):
@@ -1095,16 +1093,16 @@ class TestParserIntegration(unittest.TestCase):
         pattern = stmt.cases[0].condition.patterns[0]
 
         # Root should be AND
-        self.assertIsInstance(pattern, AndPattern)
+        self.assertIsInstance(pattern, nodes.AndPattern)
 
         # Right side should be relational (< 100)
-        self.assertIsInstance(pattern.right, RelationalPattern)
+        self.assertIsInstance(pattern.right, nodes.RelationalPattern)
         self.assertEqual(pattern.right.op, "<")
 
         # Left side should be another AND
-        self.assertIsInstance(pattern.left, AndPattern)
-        self.assertIsInstance(pattern.left.left, TypePattern)
-        self.assertIsInstance(pattern.left.right, RelationalPattern)
+        self.assertIsInstance(pattern.left, nodes.AndPattern)
+        self.assertIsInstance(pattern.left.left, nodes.TypePattern)
+        self.assertIsInstance(pattern.left.right, nodes.RelationalPattern)
 
     def test_match_empty_positional_pattern(self):
         """Test match with empty positional pattern."""
@@ -1113,7 +1111,7 @@ class TestParserIntegration(unittest.TestCase):
 
         self.assertFalse(errors)
         pos_pat = stmt.cases[0].condition
-        self.assertIsInstance(pos_pat, PositionalPattern)
+        self.assertIsInstance(pos_pat, nodes.PositionalPattern)
         self.assertEqual(len(pos_pat.patterns), 0)
 
     def test_match_mixed_patterns(self):
@@ -1125,11 +1123,11 @@ class TestParserIntegration(unittest.TestCase):
         patterns = stmt.cases[0].condition.patterns
 
         self.assertEqual(len(patterns), 5)
-        self.assertIsInstance(patterns[0], ConstantPattern)  # 1
-        self.assertIsInstance(patterns[1], WildcardPattern)  # _
-        self.assertIsInstance(patterns[2], TypePattern)  # is int
-        self.assertIsInstance(patterns[3], RelationalPattern)  # > 5
-        self.assertIsInstance(patterns[4], ConstantPattern)  # "text"
+        self.assertIsInstance(patterns[0], nodes.ConstantPattern)  # 1
+        self.assertIsInstance(patterns[1], nodes.WildcardPattern)  # _
+        self.assertIsInstance(patterns[2], nodes.TypePattern)  # is int
+        self.assertIsInstance(patterns[3], nodes.RelationalPattern)  # > 5
+        self.assertIsInstance(patterns[4], nodes.ConstantPattern)  # "text"
 
     # 20. MATCH STATEMENT - COMPLEX CASES
 
@@ -1152,9 +1150,9 @@ class TestParserIntegration(unittest.TestCase):
         case_body = stmt.cases[0].body
         self.assertEqual(len(case_body.statements), 3)
 
-        self.assertIsInstance(case_body.statements[0], AssignmentStatement)
-        self.assertIsInstance(case_body.statements[1], WhileStatement)
-        self.assertIsInstance(case_body.statements[2], ReturnStatement)
+        self.assertIsInstance(case_body.statements[0], nodes.AssignmentStatement)
+        self.assertIsInstance(case_body.statements[1], nodes.WhileStatement)
+        self.assertIsInstance(case_body.statements[2], nodes.ReturnStatement)
 
     def test_match_multiple_subjects_with_patterns(self):
         """Test match with multiple subjects and pattern matching."""
@@ -1173,13 +1171,13 @@ class TestParserIntegration(unittest.TestCase):
 
         # First case: [is int, > 0]
         case1_patterns = stmt.cases[0].condition.patterns
-        self.assertIsInstance(case1_patterns[0], TypePattern)
-        self.assertIsInstance(case1_patterns[1], RelationalPattern)
+        self.assertIsInstance(case1_patterns[0], nodes.TypePattern)
+        self.assertIsInstance(case1_patterns[1], nodes.RelationalPattern)
 
         # Second case: [_, is string]
         case2_patterns = stmt.cases[1].condition.patterns
-        self.assertIsInstance(case2_patterns[0], WildcardPattern)
-        self.assertIsInstance(case2_patterns[1], TypePattern)
+        self.assertIsInstance(case2_patterns[0], nodes.WildcardPattern)
+        self.assertIsInstance(case2_patterns[1], nodes.TypePattern)
 
     # 21. SOURCE LOCATION TRACKING
 
@@ -1320,12 +1318,6 @@ class TestParserIntegration(unittest.TestCase):
         with self.assertRaises(ParserError):
             parser.parse_program()
 
-    # def test_error_unexpected_token(self):
-    #     """Test error handling for unexpected tokens."""
-    #     parser, errors = self.parse_source("x = @;")
-
-    #     with self.assertRaises(Exception):
-    #         parser.try_parse_expression()
 
     def test_error_statement_with_no_effect(self):
         """Test error for statement that has no effect."""
@@ -1372,7 +1364,7 @@ class TestParserIntegration(unittest.TestCase):
         stmt, errors = self.parse_stmt(source)
 
         self.assertFalse(errors)
-        self.assertIsInstance(stmt, AssignmentStatement)
+        self.assertIsInstance(stmt, nodes.AssignmentStatement)
 
     def test_edge_case_deeply_nested_blocks(self):
         """Test deeply nested block structures."""
@@ -1383,19 +1375,19 @@ class TestParserIntegration(unittest.TestCase):
 
         # Navigate through nesting
         level1 = stmt
-        self.assertIsInstance(level1, Block)
+        self.assertIsInstance(level1, nodes.Block)
 
         level2 = level1.statements[0]
-        self.assertIsInstance(level2, Block)
+        self.assertIsInstance(level2, nodes.Block)
 
         level3 = level2.statements[0]
-        self.assertIsInstance(level3, Block)
+        self.assertIsInstance(level3, nodes.Block)
 
         level4 = level3.statements[0]
-        self.assertIsInstance(level4, Block)
+        self.assertIsInstance(level4, nodes.Block)
 
         assignment = level4.statements[0]
-        self.assertIsInstance(assignment, AssignmentStatement)
+        self.assertIsInstance(assignment, nodes.AssignmentStatement)
 
     def test_edge_case_function_with_many_parameters(self):
         """Test function with many parameters."""
@@ -1415,7 +1407,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr(f"foo({args})")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, FunctionCall)
+        self.assertIsInstance(expr, nodes.FunctionCall)
         self.assertEqual(len(expr.arguments), 15)
 
     def test_edge_case_empty_program(self):
@@ -1437,7 +1429,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr('"hello\\nworld\\t!"')
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, StringLiteral)
+        self.assertIsInstance(expr, nodes.StringLiteral)
         self.assertEqual(expr.value, "hello\nworld\t!")
 
     def test_integration_lexer_float_numbers(self):
@@ -1445,7 +1437,7 @@ class TestParserIntegration(unittest.TestCase):
         expr, errors = self.parse_expr("3.14159")
 
         self.assertFalse(errors)
-        self.assertIsInstance(expr, FloatLiteral)
+        self.assertIsInstance(expr, nodes.FloatLiteral)
         self.assertAlmostEqual(expr.value, 3.14159)
 
     def test_integration_lexer_comments_ignored(self):
@@ -1471,7 +1463,7 @@ class TestParserIntegration(unittest.TestCase):
 
         expr2, errors2 = self.parse_expr("iff")
         self.assertFalse(errors2)
-        self.assertIsInstance(expr2, Variable)
+        self.assertIsInstance(expr2, nodes.Variable)
         self.assertEqual(expr2.name, "iff")
 
     def test_integration_complex_match_in_function(self):
@@ -1503,7 +1495,7 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(len(func.body.statements), 3)
 
         match_stmt = func.body.statements[1]
-        self.assertIsInstance(match_stmt, MatchStatement)
+        self.assertIsInstance(match_stmt, nodes.MatchStatement)
 
         # Verify match structure
         self.assertEqual(len(match_stmt.subjects), 2)
@@ -1527,8 +1519,6 @@ class TestParserIntegration(unittest.TestCase):
         """
 
         parser, errors = self.parse_source(source)
-
-        program = parser.parse_program()
 
         print("\n\nzrzut drzewa ast")
 

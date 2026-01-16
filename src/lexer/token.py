@@ -1,10 +1,15 @@
+from typing import Any
+from src.common.position import Position
+from src.lexer.token_type import TokenType
+
+
 class Token:
-    def __init__(self, type, value, position):
+    def __init__(self, type: TokenType, value: Any, position: Position) -> None:
         self.type = type
-        self.value = value  #  to tylko dla literałów
+        self.value = value  # to tylko dla literałów
         self.position = position
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Token):
             return False
 
@@ -19,7 +24,7 @@ class Token:
 
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         type_name = self.type.name
 
         if self.value is not None:
