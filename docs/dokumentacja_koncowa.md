@@ -1,17 +1,17 @@
-# Projekt wstepny: Język "Matcha" 
+# Dokumentacja projektu: Język "Matcha" 
 
 ## 1. Wstęp
 
-Matcha jest językiem programowania ogólnego przeznaczenia. Został zaprojektowany jako język **silnie i dynamicznie typowany**, z **mutowalnymi zmiennymi**.
+Matcha jest językiem programowania ogólnego przeznaczenia. Został zaprojektowany jako język **silnie i dynamicznie typowany**, z **mutowalnymi zmiennymi**, bez automatycznej promocji typów.
 
-Język wspiera:
+Cechy języka:
 - Podstawowe typy danych: `int`, `float`, `str`, `bool`
 - Standardowe operacje matematyczne i logiczne
-- Komentarze
-- Struktury  wymagane przez projekt:
-  - Instrukcje warunkowe (`if`)
-  - Pętle (`while`)
-  - Definiowanie i wywoływanie funkcji (`fun`) z obsługą rekursji
+- Komentarze jednoliniowe (`//`)
+- Instrukcje warunkowe (`if`)
+- Pętle (`while`)
+- Definiowanie i wywoływanie funkcji (`fun`) z obsługą rekursji
+- instrukcja match z pattern matchingiem
 
 ###  Instrukcja `match`
 
@@ -24,8 +24,8 @@ Język wspiera:
 }
 ```
 2. **Dwa tryby case**:
-   - **Wzorce Pozycyjne** (`case [>10, is int] =>`) - unikalna składnia, wykrywająca w kolejności zbindowane w nagłówku argumenty, ten tryb jest aktywowany po wykryciu po symbolu case nawiasu kwadratowego
-   - **Wyrażenia Warunkowe** (`case zmienna1 > 10 and zmienna 2 is int => `) - standardowa składnia
+   - **Wzorce Pozycyjne** (`[>10, is int] =>`) - unikalna składnia, wykrywająca w kolejności zbindowane w nagłówku argumenty, ten tryb jest aktywowany po wykryciu po symbolu case nawiasu kwadratowego
+   - **Wyrażenia Warunkowe** (`zmienna1 > 10 and zmienna 2 is int => `) - standardowa składnia
 
 Instrukcja `match` nie zwraca wartości (jest instrukcją) i działa w logice **"Wykonaj Wszystkie Pasujące gałęzie"**.
 
@@ -44,16 +44,16 @@ Instrukcja `match` nie zwraca wartości (jest instrukcją) i działa w logice **
 **Dynamiczne**: Typy są sprawdzane w czasie wykonania (runtime). Zmienne nie mają stałego typu; typ jest powiązany z wartością.
 
 **Silne**: Operacje między niekompatybilnymi typami są zabronione.
+Nie ma automatycznej konwersji między int a float.
 
 ### 2.3 Zmienne
 
-- **Deklaracja**: Zmienne są tworzone przy pierwszym przypisaniu. Użycie `var` jest opcjonalne:
+- **Deklaracja**: Zmienne są tworzone przy pierwszym przypisaniu.
   ```sc
-  var x = 10;  // lub
   x = 10;
   ```
-- **Mutowalność**: Zmienne są mutowalne, można nadpisywać ich wartość 
-- **Zasięg**:  Zmienne zadeklarowane w bloku `{...}` (np. w `if`, `while`, `fun` lub `match`) nie są widoczne na zewnątrz
+- **Mutowalność**: Zmienne są mutowalne, można nadpisywać ich wartość oraz typ.
+- **Zasięg**:  Zmienne zadeklarowane w bloku `{...}` (np. w `if`, `while`, `fun` lub `match`) nie są widoczne na zewnątrz. Wewnętrzne bloki mają dostęp do zmiennych zewnętrznych.
 
 ### 2.4 Operatory (od najwyższego priorytetu)
 
@@ -65,10 +65,12 @@ Instrukcja `match` nie zwraca wartości (jest instrukcją) i działa w logice **
 | `+`, `-` (binarny) | 
 | `>`, `>=`, `<`, `<=` | 
 | `==`, `!=` | 3 | 
-| `&&` (logiczne AND) | 
-| `OR` (logiczne OR) | 
+| `and` (logiczne AND) | 
+| `or` (logiczne OR) | 
 ### 2.5 Komentarze
-Komentarzezaczynają się od `//` i trwają do końca linii.
+Komentarze zaczynają się od `//` i trwają do końca linii.
+
+**Dzielenie ``/`` zawsze zwraca float**, nawet dla int / int.
 
 ### 2.6 Instrukcje Warunkowe
 `if (wyrażenie) { ... } else { ... }`
@@ -78,26 +80,134 @@ Komentarzezaczynają się od `//` i trwają do końca linii.
 
 ### 2.8 Funkcje
 
-- Definiowane przez `fun nazwa(arg1, arg2) { ... }`
+Definiowanie funkcji:
+```matcha
+fun nazwa(param1, param2) {
+    // ciało funkcji
+    return wartość;
+}
+```
+
+Cechy funkcji:
 - Argumenty przekazywane przez wartość
-- Wspierana rekursja
+- Wspierana rekurencja (limit głębokości: 1000)
+- Funkcja bez `return` zwraca `None`
+- Program rozpoczyna się od wywołania funkcji `main()`
 
 ### 2.9 Funkcje Wbudowane
 
-- `print(...)` i `println(...)` 
-- `input()` - pobiera `str` ze standardowego wejścia
-- `typeof(zmienna)` - zwraca typ jako `str`
+| Funkcja | Opis | Przykład |
+|---------|------|----------|
+| `print(...)` | Wypisuje bez nowej linii | `print("Hello")` |
+| `println(...)` | Wypisuje z nową linią | `println("Hello")` |
+| `input()` | Pobiera string ze stdin | `x = input()` |
+| `typeof(x)` | Zwraca typ jako string | `typeof(42)`  `"int"` |
 
-### 2.10 Konwersje Typów (Silne Typowanie)
+### 2.10 Zasady typowania 
 
-- Operacje arytmetyczne (`+`, `-`, `*`, `/`) są dozwolone tylko między `int` i `float` (chyba bez promocji `int` do `float`)
-- Konkatenacja (`+`) jest dozwolona tylko dla `string + string`
-- Operatory logiczne (`&&`, `||`) działają tylko na `bool`
-- Każda inna kombinacja (np. `int + string`, `bool * int`) jest błędem wykonania 
+| Operacja | Dozwolone typy | Wynik |
+|----------|----------------|-------|
+| `+`, `-`, `*` | `int` z `int` | `int` |
+| `+`, `-`, `*` | `float` z `float` | `float` |
+| `/` | `int` z `int` lub `float` z `float` | `float` |
+| `+` (konkatenacja) | `string` z `string` | `string` |
+| `and`, `or`, `!` | tylko `bool` | `bool` |
+| `==`, `!=` | te same typy | `bool` |
+| `<`, `>`, `<=`, `>=` | `int` z `int` lub `float` z `float` | `bool` |
 
 ---
+**Niedozwolone**:
+- Mieszanie `int` i `float` w operacjach arytmetycznych
+- Operacje arytmetyczne na `string` poza konkatenacją
+- Operacje logiczne na typach innych niż `bool`
 
-## 3. Przypadki Użycia Języka (Use Cases)
+## 3. Instrukcja Match - Szczegóły
+
+### 3.1 Składnia 
+
+```matcha
+match wyrażenie as alias {
+    warunek1 => { kod1 },
+    warunek2 => { kod2 },
+    default => { kod_domyślny }
+}
+```
+
+### 3.2 Wiele Subjects
+
+```matcha
+match expr1 as a, expr2 as b, expr3 as c {
+    [wzorzec1, wzorzec2, wzorzec3] => { ... }
+}
+```
+
+### 3.3 Tryb Wyrażeń Warunkowych
+
+Używa wyrażeń logicznych z aliasami:
+
+```matcha
+match 10 as x, 20 as y {
+    x > 5 and y < 100 => { println("Warunek spełniony"); },
+    x == 10 or y == 20 => { println("Równość"); }
+}
+```
+
+### 3.4 Tryb Wzorców Pozycyjnych
+
+Specjalna składnia `[...]` dla pattern matchingu:
+
+| Wzorzec | Opis | Przykład |
+|---------|------|----------|
+| `wartość` | Równość | `[5]` |
+| `== wartość` | Równość | `[== 5]` |
+| `!= wartość` | Nierówność | `[!= 0]` |
+| `> wartość` | Większe | `[> 10]` |
+| `< wartość` | Mniejsze | `[< 100]` |
+| `>= wartość` | Większe lub równe | `[>= 0]` |
+| `<= wartość` | Mniejsze lub równe | `[<= 50]` |
+| `is typ` | Sprawdzenie typu | `[is int]` |
+| `_` | Wildcard (zawsze pasuje) | `[_, > 5]` |
+| `wartość` | Stała | `[42]` |
+
+### 3.5 Wzorzec AND
+
+Łączenie warunków dla jednej pozycji:
+
+```matcha
+match 15 as x {
+    [> 10 AND < 20] => { println("W zakres od 11 do 19"); }
+}
+```
+
+### Wykonanie matcha
+
+1. Obliczane są wyrażenia w nagłówku
+2. Sprawdzane są i wykonywane są po kolei wszystkie pasujące gałęzie `case` oprócz default
+4. `default` wykonuje się tylko gdy NIC nie pasowało
+
+```
+match 10 as x {
+    x > 5 => { println("A"); },   // Wykona się
+    x == 10 => { println("B"); }, // Wykona się
+    x < 0 => { println("C"); },   // NIE wykona się
+    default => { println("D"); }  // NIE wykona się (bo A i B pasowały)
+}
+// Wyjście: A B
+```
+
+### 3.7 Match z Pustym Nagłówkiem
+
+Działa jak wielokrotny if:
+
+```matcha
+match {
+    x > 5 => { println("A"); },
+    y < 10 => { println("B"); }
+}
+```
+
+
+## 4. Przypadki Użycia Języka (Use Cases)
 
 ### a) Podstawy Języka
 
@@ -113,17 +223,17 @@ fun silnia(n) {
 }
 
 fun main() {
-    var i = 0;
+    i = 0;
     // Pętla 'while' 
     while (i <= 5) {
-        var wynik = silnia(i);
+        wynik = silnia(i);
         // Instrukcja warunkowa if
         if (wynik > 10) {
             println(i, "!", " = ", wynik, " - Ta silnia jest duża");
         } else {
             println(i, "!", " = ", wynik, " - Ta silnia jest mała");
         }
-        i = i + 1; // Mutowalność zmiennych 
+        i = i + 1; 
     }
 }
 
@@ -140,7 +250,7 @@ match
     x * 2 as v1, // v1 = 10
     silnia(x) as v2 // v2 = 120
 {
-    case v1 > 5 => { println("OK"); }
+    v1 > 5 => { println("OK"); }
 }
 
 # println(v1); // tu już nie ma zasięgu, będzie błąd
@@ -152,7 +262,7 @@ match
 
 ```sc
 match 10 as x, 20 as y {
-    case (x > 5 && y < 100) || (x < 0) => {
+    (x > 5 && y < 100) || (x < 0) => {
         println("Warunek złożony spełniony");
     }
 }
@@ -163,12 +273,11 @@ match 10 as x, 20 as y {
 
  `case` potrafi używać specjalnej składni `[...]` do  dopasowania wzorców dla odpowiednich w kolejności bindów z nagłówka.
 
-**trudność**: Parser musi poprawnie jakoś przetłumaczyć te wzorce na zwykłe wyrażenia.
 
 ```sc
 match 10 as v1, "hello" as v2 {
  
-    case [> 5, is string] => {    // Parser tłumaczy to wewnętrznie na: (v1 > 5) AND (typeof(v2) == "string")
+    [> 5, is string] => {   
         println("Wzorzec pozycyjny pasuje");
     }
 }
@@ -177,34 +286,33 @@ match 10 as v1, "hello" as v2 {
 
 ### e) match - Wzorzec Złożony AND (wewnątrz [])
 
-Parser potrafi przetłumaczyć wiele wzorców dla jednej pozycji, łącząc je operatorem AND.
 
 ```sc
 match 15 as v1 {
     
-    case [> 10 AND < 20] => { // Parser tłumaczy to na: (v1 > 10) AND (v1 < 20)
+    [> 10 AND < 20] => { 
         println("wiek w zadanym przedziale");
     }
 }
-// Oczekiwane wyjście: "Liczba jest nastolatkiem"
+// Oczekiwane wyjście: "wiek jest w przedziale 10-20"
 ```
 
 ### f) match - Logika "Wykonaj Wszystkie Pasujące"
 
-należy przetestować WSZYSTKIE gałęzie `case` i wykonać kod dla każdej, która jest prawdziwa.
+należy przetestować WSZYSTKIE gałęzie matcha, i wykonać kod dla każdej, która jest prawdziwa.
 
 ```sc
 match 10 as x {
     // 1. Ten warunek jest Prawdziwy -> wykona się
-    case x > 5 => {
+    x > 5 => {
         println("Gałąź 1 (x > 5)");
     },
     // 2. Ten warunek też jest Prawdziwy -> wykona się
-    case x == 10 => {
+    x == 10 => {
         println("Gałąź 2 (x == 10)");
     },
     // 3. Ten warunek jest Fałszywy -> pomijamy
-    case x < 0 => {
+    x < 0 => {
         println("Gałąź 3 (x < 0)");
     }
 }
@@ -220,8 +328,8 @@ Gałąź `default` wykonuje się tylko wtedy, gdy żadna inna gałąź `case` ni
 
 ```sc
 match 10 as x {
-    case x < 0 => { /* pominięte */ },
-    case x == 5 => { /* pominięte */ },
+    x < 0 => { /* pominięte */ },
+    x == 5 => { /* pominięte */ },
     default => {
         println("Domyślne");
     }
@@ -235,7 +343,7 @@ Gałąź `default` nie wykonuje się, jeśli cokolwiek innego pasowało
 
 ```sc
 match 10 as x {
-    case x > 5 => { println("OK"); }, // Coś pasowało
+        x > 5 => { println("OK"); }, // Coś pasowało
     default => { println("ZŁY"); } // Musi być pominięte
 }
 // Oczekiwane wyjście: "OK"
@@ -259,7 +367,6 @@ należy pominać sprawdzanie pierwszego aliasu, i przejść od razu do drugiego
 
 ```sc
 match 10 as v1, "hello" as v2 {
-    // Tłumaczenie: (true) && (typeof(v2) == "string")
     case [_, is string] => { println("OK"); }
 }
 // Oczekiwane wyjście: "OK"
@@ -295,7 +402,7 @@ match 10 as v1, 20 as v2 {
 ```sc
 match 10 as v1 {
     // BŁĄD: To nie jest wyrażenie. Brakuje aliasu 'v1'
-    case > 10 => { ... }
+    > 10 => { ... }
 }
 // Oczekiwany Błąd:  Nieoczekiwany token '>'. Oczekiwano '[', lub oczekiwano wyrażenia (np. 'v1')
 ```
@@ -314,41 +421,72 @@ match 10 as v1 {
 
 ---
 
-## 4. Obsługa Błędów
+## 5. Obsługa Błędów
 
-Każdy błąd wstrzymuje wykonanie programu. Komunikaty o błędach będą zawierać typ błędu, lokalizację oraz  wiadomość co poszło nie tak.
+### 5.1 Kategorie Błędów
 
-**Format**: ` BŁĄD [<linia>:<kolumna>] (<Moduł>): <Wiadomość>`
+| Kategoria | Moduł | Opis |
+|-----------|-------|------|
+| Leksykalny | Lexer | Nieprawidłowe tokeny |
+| Składniowy | Parser | Nieprawidłowa struktura kodu |
+| Wykonania | Interpreter | Błędy w czasie działania |
 
-### Przykłady Błędów
+### 5.2 Format Komunikatów
 
-**Błąd Leksykalny:**
 ```
- BŁĄD [5:10] (Lekser): Niezamknięty literał string: "Hello...
-```
-
-**Błąd Składni:**
-```
- BŁĄD [8:5] (Parser): Oczekiwano '=>' po warunku 'case', znaleziono ';'
+[Typ błędu] - line X, col Y: Opis błędu
 ```
 
-**Błąd Składni:**
+### 5.3 Błędy Leksykalne
+
+| Błąd | Opis |
+|------|------|
+| `InvalidCharacterError` | Nieoczekiwany znak |
+| `UnterminatedStringError` | Niezamknięty string |
+| `HardLimitError` | Przekroczony limit (np. długość identyfikatora), przerwanie analizy leksykalnej |
+| `IntegerOverflowError` | Przepełnienie liczby całkowitej |
+| `UnterminatedStringError` | Niezakończony string |
+| `SoftLimitError` | Przekroczony limit (np. długość identyfikatora), analiza była kontynuowana|
+
+Przykład:
 ```
- BŁĄD [10:8] (Parser): Niezgodność liczby wzorców. Nagłówek 'match' zdefiniował 2 aliasy, ale wzorzec pozycyjny ma ich 3.
+Błąd leksykalny [5:10]: Unterminated string literal
 ```
 
-**Błąd Semantyczny:**
+### 5.4 Błędy Składniowe
+
+| Błąd | Opis |
+|------|------|
+| `MissingTokenError` | Brak oczekiwanego tokenu |
+| `UnexpectedTokenError` | Nieoczekiwany token |
+| `DuplicateDefinitionError` | Zduplikowana definicja |
+| `InvalidSyntaxError` | Nieprawidłowa składnia |
+|`MissingStatementError` | Brakująca instrukcja |
+|`MissingExpressionError` | Brakujące wyrażenie |
+
+Przykład:
 ```
-BŁĄD [12:9] : Użycie niezdefiniowanej zmiennej 'zmienna3'. Dostępne aliasy w tym 'match' to: 'zmienna1', 'zmienna2'.
+Parser error at line 8, col 5: Expected '=>' after case condition
 ```
 
-**Błąd Wykonania:**
-```
- BŁĄD [15:12] (Runtime): Nie można wykonać operatora '+' na typach 'int' i 'string'.
-```
+### 5.5 Błędy Wykonania
 
----
+| Błąd | Opis |
+|------|------|
+| `TypeError` | Niezgodność typów |
+| `NameError` | Niezdefiniowana nazwa |
+| `ValueError` | Nieprawidłowa wartość (np. dzielenie przez 0) |
+| `ArgumentError` | Nieprawidłowa liczba argumentów |
+| `LimitError` | Przekroczony limit (rekurencji) |
+| `RuntimeError` | Ogólny błąd wykonania |
 
+Przykłady:
+```
+Runtime Error - line 15, col 12: Cannot perform '+' on int and string. Types must match exactly
+Runtime Error - line 8, col 5: Division by zero
+Runtime Error - line 3, col 1: 'break' outside of loop
+Runtime Error: Maximum recursion depth exceeded (1000)
+```
 ## 5. Notacja EBNF
 
 Gramatyka jest podzielona na część leksykalną  i składniową
@@ -360,6 +498,7 @@ Gramatyka jest podzielona na część leksykalną  i składniową
 FUN               ::= "fun"
 BREAK             ::= "break"
 RETURN            ::= "return"
+CONTINUE         ::= "continue"
 VAR               ::= "var"
 IF                ::= "if"
 ELSE              ::= "else"
@@ -412,7 +551,6 @@ RBRACKET          ::= "]"
 COMMA             ::= ","
 SEMICOLON         ::= ";"
 WILDCARD          ::= "_"
-
 ```
 
 ### 5.2 Część Składniowa
@@ -428,6 +566,7 @@ statement           ::== match_statement
                      |   block_statement
                      |   assign_or_call_statement
                      |   break_statement
+                     |   continue_statement
                      ;
 
 block_statement     ::== LBRACE { statement } RBRACE
@@ -442,6 +581,7 @@ return_statement    ::== RETURN [ expression ] SEMICOLON
 assign_or_call_statement ::== call_or_identifier [ ASSIGN expression ] SEMICOLON 
 expression_statement::== expression SEMICOLON
 break_statement     ::== BREAK SEMICOLON
+continue_statement  ::== CONTINUE
 
 #  Instrukcja 'match'
 match_statement     ::== MATCH match_header LBRACE { case_branch } RBRACE
@@ -487,87 +627,80 @@ call_or_identifier  ::== IDENTIFIER [ LPAREN argument_list RPAREN ]
 argument_list       ::== [ expression { COMMA expression } ]
 literal             ::== INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL | TRUE | FALSE
 type                ::== TYPE_INT | TYPE_STR | TYPE_FLT | TYPE_BOOL
-
 ```
 
----
+
 
 # Struktura Projektu
 
-Projekt będzie składał się z modułów:
+### 7.1 Moduł Reader (CharReader)
 
-## 6.1 Czytnik
+**Cel**: Dostarczanie znaków do leksera.
 
- Moduł ten bedzie działał na pliku lub ciągu znaków. Jego zadaniem jest podawanie pojedynczych znaków do Leksera i śledzenie pozycji [linia:kolumna] 
- Jest "pytany"  przez Lekser o następny znak.
+**Interfejs**:
+- `current()` - zwraca aktualny znak
+- `advance()` - przesuwa do następnego znaku
+- `position()` - zwraca pozycję (linia, kolumna)
+- `check_next()` - podgląd następnego znaku bez przesuwania
 
-### Interfejs:
+### 7.2 Moduł Lexer
 
-- `next()`: Zwraca następny znak ze źródła i przesuwa wskaźnik.
-- `current() : Zwraca aktualny znak.
-- `position()`: Zwraca bieżącą pozycję (linia, kolumna).
+**Cel**: TWorzenie tokenów z  kodu źródłowego.
 
-## 6.2 Lekser
+**Cechy**:
+- Leniwa tokenizacja
+- Obsługa limitów (soft i hard) dla identyfikatorów, stringów, liczb
+- Walidacja escape sequences w stringach
 
- Jest leniwy, czyli generuje jeden token tylko na żądanie Parsera.
+**Interfejs**:
+- `get_next_token()` - zwraca następny token
 
-###  Wymagania:
+**Limity**:
+- Maksymalna długość identyfikatora: 64 (soft), 640 (hard)
+- Maksymalna długość stringa: 1024 (soft), 10240 (hard)
+- Maksymalna wartość int: 2147483647
 
-- Od razu konwertuje literały (np. "123") na wartości wewnętrzne (np. int(123)).
-- wykrywa specyficzne błędy (np. niezamknięty string) i raportuje je do do modułu obsługi błędów
+### 7.3 Moduł Parser
 
-**Komunikacja:** Pobiera znaki z CharReader. Jest pytany przez Parser o następny token.
+**Cel**: Budowanie drzewa AST z tokenów.
 
-### Proponowany Interfejs:
+**Cechy**:
+- Parser RD
+- Wykrywanie duplikatów (funkcje, parametry, aliasy)
+- Obsługa dwóch trybów case w match
+- Strategia obsługi błędów: ABORT(przerywamy parsowanie) lub CONTINUE(kontynuujemy)
 
-- `next(): Pobiera znaki z czytnika, buduje token i go zwraca do parsera.
-- `current(): Zwraca ostatnio wyprodukowany token
+**Interfejs**:
+- `parse_program()` - parsuje cały program, zwraca AST
 
-## 6.3 Parser (Parser)
+### 7.4 Moduł Interpreter
 
- jako Parser Zejściowy Rekurencyjny (Recursive Descent). Jego zadaniem jest 'konsumowanie 'tokenów z Leksera i budowanie z nich Drzewa AST. 
+**Cel**: Wykonanie programu na podstawie AST.
 
-### Wymaganie dla naszego matcha:
+**Cechy**:
+- Wzorzec Visitor do przechodzenia AST
+- Zarządzanie środowiskiem (Environment) z zakresami
+- Obsługa rekurencji z limitem głębokości (1000)
 
-- dla wyrażenia pozycyjnego, musi działać jako "sprytny tłumacz", od razu budując AST zwykłego wyrażenia logicznego, aby uprościć pracę Interpretera. czyli `case [_, is int]` musi zostać od razu 
-zamienione na `case (true and typeof(zmienna2) == "int")`
+**Interfejs**:
+- `load(program)` - ładuje program (rejestruje funkcje)
+- `invoke(function_name, args)` - wywołuje funkcję, domyślnie main
 
-**Komunikacja:** Pobiera tokeny z Lexer. Zwraca kompletne drzewo AST do Interpretera.
+### 7.6 Moduł Environment
 
-### Proponowany Interfejs:
+**Cel**: Zarządzanie stanem wykonania.
 
-- `parse() -> ASTNode`: Uruchamia proces parsowania, zwraca korzeń drzewa AST.
+**Komponenty**:
+- `Scope` - pojedynczy zakres zmiennych
+- `MatchScope` - specjalny zakres dla match z aliasami
+- `CallContext` - kontekst wywołania funkcji
+- `Environment` - przechowuje listę callcontextów
 
-## 6.4 Interpreter (jeszcze nie wiem)
+**Cechy**:
+- Flagi sterujące: break, continue, return
+- Śledzenie głębokości pętli
+- Zarządzanie funkcjami globalnymi
 
-**Cel:** Przechodzi po drzewie AST  i wykonuje kod. 
-
-### Kluczowe Wymagania:
-
-- Tworzy tymczasowy zasięg dla aliasów, oblicza nagłówek, a następnie iteruje po caseach. musi obsłużyć logikę  `did_anything_match` dla default, czyli gdy żadna poprzednia gałąź nie została wykonana.
-- Wszystkie casey  są już wcześniej przetłumaczone przez parser na zwykłe wyrażenia
-- Funkcje wbudowane są traktowane tak samo jak funkcje użytkownika.
-
-**Komunikacja:** Otrzymuje korzeń drzewa od Parsera, po czym wykonuje logikę.
-
-### Proponowany Interfejs:
-
-- `interpret(tree: ASTNode)`: Wykonuje program reprezentowany przez tree.
-- `evaluate(expression_node: ASTNode) -> Value`: Wewnętrzna funkcja do obliczania wartości dowolnego wyrażenia.
-
-## 6.5 Moduł Obsługi Błędów 
-
-**Cel:** Moduł który zbiera błędy ze wszystkich innych etapów (Lekser, Parser, Interpreter).
-
-**Komunikacja:** Wszystkie moduły mogą wypychać  błędy do tego modułu. 
-
-### Proponowany Interfejs:
-
-- `report_error(position, message, module_name)`: Metoda wywoływana przez Lekser, Parser, itp.
-- `has_errors() -> bool`: Sprawdza, czy wystąpiły jakiekolwiek błędy.
-- `print_diagnostics()`: Wypisuje wszystkie zebrane błędy w ustandaryzowanym formacie.
-
----
 
 # 7. Testy
 
@@ -604,3 +737,67 @@ zamienione na `case (true and typeof(zmienna2) == "int")`
 - Zestaw testów będzie zawierał  Przykłady Użycia Języka z Sekcji 3.
 - testy pozytywne jak i negatywne będą równie ważne
 ---
+
+## 8. Testowanie
+
+Testy interpretra w pytest, tes
+### 8.1 Struktura Testów
+
+```
+tests/
+├── conftest.py              # Fixtures i helpery
+├── test_lexer.py            # Testy leksera (unittest)
+├── test_parser.py           # Testy parsera (unittest)
+├── test_interpreter_programs.py    # testy programów (pytest)
+└── test_interpreter_edge_cases.py  # testy przypadków brzegowych (pytest)
+└──
+
+```
+
+### 8.2 Kategorie Testów
+
+**Testy jednostkowe**:
+- Lexer: tokenizacja, limity
+- Parser: każde produkcje, błędy składniowe
+- Reader: odczytywnie sekwencji znaków, znaku końca linii, 
+    testy podglądania kolejnego znaku
+
+**Testy integracyjne**:
+- Pełne programy przez cały pipeline
+- Algorytmy (silnia, Fibonacci, NWD)
+- Zagnieżdżone struktury
+
+**Testy negatywne**:
+- Błędy typów
+- Niezdefiniowane zmienne/funkcje
+- Break/continue poza pętlą
+- Przekroczenie limitów
+
+### 8.3 Uruchamianie Testów
+
+```bash
+# Wszystkie testy interpretera
+pytest tests/ -v
+```
+```bash
+# wszystkie testy parsera, lexera i readera
+python3 -m unittest discover
+```
+
+---
+
+## Uruchamianie Programu
+
+Z poziomu katalogu głównego projektu:
+
+### Z pliku źródłowego
+```bash
+python3 main.py nazwa_pliku.matcha
+```
+
+### Z kodu podanego bezpośrednio w linii poleceń
+```bash
+python3 main.py -c "fun main() { print("Hello") }"
+```
+
+### Przykład
