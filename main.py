@@ -15,7 +15,7 @@ def run(stream: TextIO) -> bool:
     errors = []
 
     reader = CharReader(stream)
-    lexer = Lexer(reader)
+    lexer = Lexer(reader, errors.append)
     parser = Parser(lexer, errors.append)
     program = parser.parse_program()
 
@@ -27,7 +27,7 @@ def run(stream: TextIO) -> bool:
                 print(f"Błąd parsowania: {err}", file=sys.stderr)
             else:
                 print(f"Błąd: {err}", file=sys.stderr)
-        return False
+
 
     interpreter = Interpreter()
 

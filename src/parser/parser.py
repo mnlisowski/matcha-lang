@@ -491,11 +491,11 @@ class Parser:
                     "Expected nodes.expression after '='", self._loc()
                 )
 
-            self.consume(TokenType.SEMICOLON, "Expected ';' after assignment")
+            self.consume(TokenType.SEMICOLON, "Expected ';' after assignment", strategy="CONTINUE")
 
             return nodes.AssignmentStatement(left.name, expr, loc)
 
-        self.consume(TokenType.SEMICOLON, "Expected ';' after nodes.statement")
+        self.consume(TokenType.SEMICOLON, "Expected ';' after nodes.statement", strategy="CONTINUE")
 
         if isinstance(left, nodes.FunctionCall):
             return nodes.FunctionCallStatement(left.name, left.arguments, loc)

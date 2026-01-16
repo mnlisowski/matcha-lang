@@ -19,7 +19,7 @@ class Interpreter(Visitor):
     def __init__(self) -> None:
         self.environment = (
             Environment()
-        )  # przydatne przy wywołaniach funkcji gdzie nie chcemy przesłaniać zmiennych
+        ) 
         self._build_builtins()
         self.last_result: Any = None
 
@@ -117,13 +117,6 @@ class Interpreter(Visitor):
                 f"{context} must be bool, got {type(value).__name__}", location
             )
 
-    def interpret(self, node: nodes.ASTNode) -> Any:
-        try:
-            node.accept(self)
-            return self.last_result
-        except LimitError as e:
-            raise RuntimeError(str(e), None)
-
     def visit_Program(self, node: nodes.Program) -> None:
         for func_def in node.functions:
             if self.environment.has_function(func_def.name):
@@ -150,6 +143,7 @@ class Interpreter(Visitor):
 
             for param_name, arg_value in zip(node.params, args):
                 self.environment.define(param_name, arg_value)
+            # tu zweryfikowac ze arg moze byc none (builtiny)
 
             node.body.accept(self)
 
@@ -173,6 +167,7 @@ class Interpreter(Visitor):
     def visit_FunctionCallStatement(self, node: nodes.FunctionCallStatement) -> None:
         call_node = nodes.FunctionCall(node.name, node.arguments, node.location)
         call_node.accept(self)
+        self.last_result = None
 
     def visit_ReturnStatement(self, node: nodes.ReturnStatement) -> None:
         if self.environment.depth() == 0:
@@ -404,7 +399,7 @@ class Interpreter(Visitor):
         node.condition.accept(self)
         self._check_bool(self.last_result, "While condition", node.location)
 
-        while self.last_result:
+        while self.consume():
             self.environment.enter_loop()
             node.body.accept(self)
 

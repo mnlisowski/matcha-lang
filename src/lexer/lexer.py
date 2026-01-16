@@ -236,8 +236,7 @@ class Lexer:
 
         result = []
         exceeded_soft_limit = False
-        invalid_escape_char = None
-        invalid_escape_pos = None
+      
 
         escape_map = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}
 
@@ -256,9 +255,10 @@ class Lexer:
                 if self.current_char in escape_map:
                     result.append(escape_map[self.current_char])
                 else:
-                    if invalid_escape_char is None:
-                        invalid_escape_char = self.current_char
-                        invalid_escape_pos = self.reader.position()
+                    self._report_warning(
+                    InvalidEscapeSequenceError(self.current_char, self.reader.position())
+                    )
+                   
                     result.append(self.current_char)
             else:
                 result.append(self.current_char)
@@ -268,10 +268,7 @@ class Lexer:
         if self.current_char == '"':
             self.advance()
 
-            if invalid_escape_char is not None:
-                self._report_warning(
-                    InvalidEscapeSequenceError(invalid_escape_char, invalid_escape_pos)
-                )
+
 
             if exceeded_soft_limit:
                 self._report_warning(
