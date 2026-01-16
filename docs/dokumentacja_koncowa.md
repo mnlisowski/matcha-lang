@@ -781,7 +781,7 @@ pytest tests/ -v
 ```
 ```bash
 # wszystkie testy parsera, lexera i readera
-python3 unittest discover
+python3 -m unittest discover
 ```
 
 ---
