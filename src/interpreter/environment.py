@@ -190,7 +190,7 @@ class CallContext:
 
 
 class Environment:
-    max_depth = 1000
+    max_depth = 100
 
     def __init__(self) -> None:
         self._call_contexts: List[CallContext] = []
