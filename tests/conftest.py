@@ -1,8 +1,7 @@
-
 import pytest
 import io
 import sys
-from typing import Any, Optional
+from typing import Any
 
 from src.lexer.reader import CharReader
 from src.lexer.lexer import Lexer, LexerError
@@ -11,7 +10,6 @@ from src.interpreter.interpreter import Interpreter
 
 
 def run_code(source: str, entry_point: str = "main") -> Any:
-    
     errors = []
 
     reader = CharReader(io.StringIO(source))
@@ -34,9 +32,7 @@ def run_code(source: str, entry_point: str = "main") -> Any:
     return interpreter.invoke(entry_point)
 
 
-
-
 @pytest.fixture
 def run():
+   
     return run_code
-

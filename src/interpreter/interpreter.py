@@ -23,8 +23,8 @@ class Interpreter(Visitor):
         self._build_builtins()
         self.last_result: Any = None
 
-    MAX_INT = 2147483647        
-    MIN_INT = -2147483648       
+    MAX_INT = 2147483647
+    MIN_INT = -2147483648
     MAX_FLOAT = 1e308
     MIN_FLOAT = -1e308
     DIVISOR = 1e-10
@@ -92,7 +92,7 @@ class Interpreter(Visitor):
                 f"Operator '{operator}' requires numeric type, got {type(value).__name__}",
                 location,
             )
-        
+
     def _check_numeric_limits(self, value: Any, location: nodes.SourceLocation) -> Any:
         if isinstance(value, bool):
             return value
@@ -107,8 +107,7 @@ class Interpreter(Visitor):
     def _check_divisor(self, value: Any, location: nodes.SourceLocation) -> None:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             if abs(value) < self.DIVISOR:
-                raise ValueError(f"Division by near-zero value: {value}", location)
-            
+                raise ValueError(f"Division by near zero value: {value}", location)
 
     def _check_bool(
         self, value: Any, context: str, location: nodes.SourceLocation
@@ -261,10 +260,9 @@ class Interpreter(Visitor):
         self._check_same_types(left, right, "/", node.location)
         self._check_numeric(left, "/", node.location)
 
-        self._check_divisor(right, node.location) 
+        self._check_divisor(right, node.location)
         result = left / right
         self.last_result = self._check_numeric_limits(result, node.location)
-
 
     def visit_UnaryMinusExpression(self, node: nodes.UnaryMinusExpression) -> None:
         node.operand.accept(self)

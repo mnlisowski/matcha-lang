@@ -2,7 +2,7 @@
 
 import sys
 import io
-from typing import TextIO, Any
+from typing import TextIO
 
 from src.lexer.reader import CharReader
 from src.lexer.lexer import Lexer, LexerError
@@ -13,7 +13,6 @@ from src.interpreter.interpreter import Interpreter, RuntimeError
 
 def run(stream: TextIO) -> bool:
     errors = []
-
 
     reader = CharReader(stream)
     lexer = Lexer(reader)

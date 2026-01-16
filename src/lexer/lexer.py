@@ -275,9 +275,7 @@ class Lexer:
 
             if exceeded_soft_limit:
                 self._report_warning(
-                    SoftLimitError(
-                        "String literal", self.max_string_length, start_pos
-                    )
+                    SoftLimitError("String literal", self.max_string_length, start_pos)
                 )
 
             return Token(TokenType.STRING_LITERAL, "".join(result), start_pos)
