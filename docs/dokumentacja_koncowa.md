@@ -797,7 +797,7 @@ python3 main.py nazwa_pliku.matcha
 
 ### Z kodu podanego bezpośrednio w linii poleceń
 ```bash
-python3 main.py -c "fun main() { println(\"Hello World\"); }"
+python3 main.py -c "fun main() { print("Hello") }"
 ```
 
 ### Przykład
