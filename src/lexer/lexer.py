@@ -62,6 +62,9 @@ class SoftLimitError(LexerError):
         return f"Warning {self.position}: {self.element_type} exceeded soft limit ({self.limit})"
 
 
+SoftLimitWarning = SoftLimitError
+
+
 class Lexer:
     def __init__(
         self,

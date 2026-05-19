@@ -106,6 +106,8 @@ class Interpreter(Visitor):
 
     def _check_divisor(self, value: Any, location: nodes.SourceLocation) -> None:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if value == 0:
+                raise ValueError("Division by zero", location)
             if abs(value) < self.DIVISOR:
                 raise ValueError(f"Division by near zero value: {value}", location)
 
@@ -545,6 +547,10 @@ class Interpreter(Visitor):
 
     def load(self, node: nodes.ASTNode) -> None:
         node.accept(self)
+
+    def interpret(self, node: nodes.ASTNode) -> Any:
+        node.accept(self)
+        return self.consume()
 
     def invoke(self, function_name: str, args: Optional[List[Any]] = None) -> Any:
         if args is None:

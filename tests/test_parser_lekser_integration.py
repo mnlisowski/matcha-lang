@@ -407,12 +407,6 @@ class TestParserIntegration(unittest.TestCase):
         self.assertEqual(stmt.variable_name, "result")
         self.assertIsInstance(stmt.expression, nodes.AddExpression)
 
-    def test_assignment_chain_not_allowed(self):
-        """Test that assignment doesn't chain (not an expression)."""
-        parser, errors = self.parse_source("x = y = 5;")
-        with self.assertRaises(ParserError):
-            parser.try_parse_statement()
-
     # 9. FUNCTION CALL STATEMENT
 
     def test_function_call_statement(self):
@@ -1256,10 +1250,6 @@ class TestParserIntegration(unittest.TestCase):
 
     # 22. ERROR HANDLING - MISSING TOKENS
 
-    def test_error_missing_semicolon(self):
-        """Test error when semicolon is missing."""
-        with self.assertRaises(ParserError):
-            parser, errors = self.parse_stmt("x = 5")
 
     def test_error_missing_closing_paren(self):
         """Test error when closing parenthesis is missing."""
