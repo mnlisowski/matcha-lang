@@ -1,18 +1,32 @@
 # Matcha
 
-Matcha to interpreter  języka programowania napisany w Pythonie.
+Matcha to interpreter języka programowania napisany w Pythonie.
 Projekt zawiera czytnik znaków, lekser, parser budujący AST oraz interpreter.
+Program jest uruchamiany od funkcji `main`.
+
+## Wymagania
+
+- Python 3.10+
+- `pytest` do uruchamiania testów
 
 ## Funkcje języka
 
 - typy: `int`, `float`, `string`, `bool`
+- silne, dynamiczne typowanie bez automatycznej promocji `int`/`float`
 - zmienne tworzone przez przypisanie, np. `x = 10;`
+- zakresy blokowe dla funkcji, pętli, warunków i `match`
+- operatory arytmetyczne: `+`, `-`, `*`, `/`
+- operatory porównania: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- operatory logiczne: `and`, `or`, `!`
 - instrukcje `if`, `else`, `while`
-- funkcje definiowane przez `fun`
 - `return`, `break`, `continue`
+- funkcje definiowane przez `fun`
+- rekurencja
 - komentarze jednoliniowe `//`
 - funkcje wbudowane: `print`, `println`, `input`, `typeof`
-- instrukcja `match` z warunkami i wzorcami pozycyjnymi
+- instrukcja `match` z aliasami, warunkami logicznymi i wzorcami pozycyjnymi
+- wzorce w `match`: `_`, stałe, relacje, `is typ`, złożenia `AND`
+- `match` wykonuje wszystkie pasujące gałęzie; `default` działa tylko przy braku dopasowania
 
 ## Uruchamianie
 
@@ -80,10 +94,10 @@ src/ast/                    węzły AST i visitor
 src/interpreter/            interpreter i środowisko wykonania
 tests/                      testy
 docs/projekt_wstepny.md     dokumentacja wstępna
-DOKUMENTACJA_KONCOWA.md     dokumentacja końcowa
+dokumentacja_koncowa.md     dokumentacja końcowa
 ```
 
 ## Dokumentacja
 
-- [Dokumentacja końcowa](DOKUMENTACJA_KONCOWA.md)
+- [Dokumentacja końcowa](dokumentacja_koncowa.md)
 - [Projekt wstępny](docs/projekt_wstepny.md)
