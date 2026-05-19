@@ -1,0 +1,75 @@
+fun factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fun fib(n) {
+    if (n <= 1) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+fun mod(value, divisor) {
+    result = value;
+    while (result >= divisor) {
+        result = result - divisor;
+    }
+    return result;
+}
+
+fun classify_number(value) {
+    match value {
+        [< 0] => { return "negative"; },
+        [== 0] => { return "zero"; },
+        [> 0 AND < 10] => { return "small"; },
+        [>= 10] => { return "large"; },
+        default => { return "unknown"; }
+    }
+}
+
+fun score_step(step, total) {
+    match step as current, total as score {
+        [is int, is int] => { println("step=", current, ", score=", score); },
+        [> 4, _] => { println("late step"); }
+    }
+
+    if (mod(step, 2) == 0) {
+        return total + factorial(step);
+    } else {
+        return total + fib(step);
+    }
+}
+
+fun main() {
+    println("Matcha demo");
+
+    total = 0;
+    step = 1;
+
+    while (step <= 6) {
+        if (step == 5) {
+            step = step + 1;
+            continue;
+        }
+
+        total = score_step(step, total);
+
+        match total as points, classify_number(total) as kind {
+            [> 100, is string] => { println("high score: ", points, " (", kind, ")"); },
+            [> 20 AND <= 100, _] => { println("medium score: ", points); },
+            default => { println("low score: ", points); }
+        }
+
+        if (total > 200) {
+            break;
+        }
+
+        step = step + 1;
+    }
+
+    println("final score: ", total);
+    println("final type: ", typeof(total));
+}
