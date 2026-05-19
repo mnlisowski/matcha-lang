@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 
-import sys
 import io
+import sys
 from typing import TextIO
 
 from src.lexer.reader import CharReader
 from src.lexer.lexer import Lexer, LexerError
 from src.parser.parser import Parser, ParserError
 from src.interpreter.interpreter import Interpreter, RuntimeError
-# from src.ast_nodes import FunctionCall, SourceLocation
+
+
+USAGE = """Użycie:
+  python3 main.py <plik.matcha>
+  python3 main.py -c '<kod>'
+
+Opcje:
+  -c <kod>       uruchamia kod przekazany w linii poleceń
+  -h, --help     wyświetla pomoc
+"""
 
 
 def run(stream: TextIO) -> bool:
@@ -17,7 +26,12 @@ def run(stream: TextIO) -> bool:
     reader = CharReader(stream)
     lexer = Lexer(reader, errors.append)
     parser = Parser(lexer, errors.append)
-    program = parser.parse_program()
+
+    try:
+        program = parser.parse_program()
+    except ParserError as err:
+        errors.append(err)
+        program = None
 
     if errors:
         for err in errors:
@@ -27,7 +41,7 @@ def run(stream: TextIO) -> bool:
                 print(f"Błąd parsowania: {err}", file=sys.stderr)
             else:
                 print(f"Błąd: {err}", file=sys.stderr)
-
+        return False
 
     interpreter = Interpreter()
 
@@ -42,34 +56,45 @@ def run(stream: TextIO) -> bool:
     return True
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
-        print("Użycie:")
-        sys.exit(1)
+def main() -> int:
+    args = sys.argv[1:]
+
+    if not args:
+        print(USAGE, end="", file=sys.stderr)
+        return 1
+
+    if args[0] in ("-h", "--help"):
+        print(USAGE, end="")
+        return 0
 
     try:
-        if sys.argv[1] == "-c":
-            if len(sys.argv) < 3:
-                print("brak kodu po -c")
-                sys.exit(1)
+        if args[0] == "-c":
+            if len(args) != 2:
+                print(
+                    "Błąd: opcja -c wymaga dokładnie jednego argumentu z kodem",
+                    file=sys.stderr,
+                )
+                print(USAGE, end="", file=sys.stderr)
+                return 1
 
-            source_stream = io.StringIO(sys.argv[2])
-            run(source_stream)
-        else:
-            filename = sys.argv[1]
-            with open(filename, "r", encoding="utf-8") as f:
-                run(f)
+            return 0 if run(io.StringIO(args[1])) else 1
+
+        if len(args) != 1:
+            print("Błąd: podano za dużo argumentów", file=sys.stderr)
+            print(USAGE, end="", file=sys.stderr)
+            return 1
+
+        filename = args[0]
+        with open(filename, "r", encoding="utf-8") as f:
+            return 0 if run(f) else 1
 
     except FileNotFoundError:
-        print(f"Błąd: Plik '{sys.argv[1]}' nie istnieje", file=sys.stderr)
-        sys.exit(1)
-    except ParserError as e:
-        print(f"Błąd składni: {e}", file=sys.stderr)
-        sys.exit(1)
+        print(f"Błąd: plik '{args[0]}' nie istnieje", file=sys.stderr)
+        return 1
     except RuntimeError as e:
         print(f"Błąd wykonania: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
